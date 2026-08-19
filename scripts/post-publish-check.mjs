@@ -27,10 +27,14 @@ const problems = []
 
 console.log(`post-publish-check: ${name}@${version}`)
 
-/** True once `npm view <pkg>@<version>` stops 404-ing (index caught up). */
+/** True once `npm view <pkg>@<version>` stops 404-ing (index caught up).
+ *  Suppresses stderr so the expected E404 while the index is still catching up
+ *  never floods the console. */
 function versionVisible() {
   try {
-    return run(`npm view ${JSON.stringify(name)}@${version} version`).length > 0
+    return run(`npm view ${JSON.stringify(name)}@${version} version`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).length > 0
   } catch {
     return false
   }

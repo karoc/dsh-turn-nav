@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const read = (file) => readFileSync(join(root, file), 'utf8')
-const run = (cmd) => execSync(cmd, { cwd: root, encoding: 'utf8', timeout: 15000 }).trim()
+const run = (cmd, opts = {}) => execSync(cmd, { cwd: root, encoding: 'utf8', timeout: 15000, ...opts }).trim()
 const failures = []
 const fail = (message) => failures.push(message)
 
@@ -152,9 +152,14 @@ if (stale.length > 0) {
 }
 
 // 8. not already published (best effort; offline or 404 means not published).
+// The registry answers a missing version with E404; probe quietly (stderr
+// suppressed) so an expected "not published yet" never floods the console
+// with a scary npm error block.
 try {
   const packageName = JSON.parse(read('package.json')).name
-  const published = run(`npm view ${JSON.stringify(packageName)}@${version} version`)
+  const published = run(`npm view ${JSON.stringify(packageName)}@${version} version`, {
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
   if (published.length > 0) fail(`version ${version} is already published on npm (${published}) — bump the version`)
 } catch {
   // E404 or network failure: treated as "not published yet"
