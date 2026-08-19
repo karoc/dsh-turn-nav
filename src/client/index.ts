@@ -8,11 +8,13 @@
  */
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the shell's SlotMap merges (the 'conversation.session
 // .header.utilities' entry) into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { TurnNavRail, type RailInjected } from './TurnNavRail.tsx'
 import { en, zh, type TurnNavKey } from './locales.ts'
 // Side-effect import: injects the design-token styles at module evaluation
@@ -31,7 +33,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 const NS = 'dsh-turn-navigator'
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'connection']
 
 /**
  * Browser plugin body: registers the turn rail into the session header
@@ -42,6 +44,8 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-turn-navigator: copy dictionaries')
 
   const t = ctx.locale.bind(NS) as (key: TurnNavKey, params?: Record<string, unknown>) => string
+  const connection = ctx.get('connection') as ConnectionHandle | undefined
+  const api = connection?.api
 
   // Session-header utilities: the floating turn rail (session scope gives
   // useSession). It renders as position:fixed, so it does not occupy the
@@ -53,6 +57,7 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: (): RailInjected => ({
       t,
+      api: api as RailInjected['api'],
     }),
   }, TurnNavRail))
 }

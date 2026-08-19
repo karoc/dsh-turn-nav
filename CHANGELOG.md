@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Aggressive stall protection for very long conversations** (hundreds of turns): initial auto-load now pulls only a few pages (`MAX_AUTO_PAGES = 5`, was 30), and the rail-top scroll loads at most 3 pages per continuous pass — scroll away and back to load more. Every page prepend re-renders the whole conversation flow, so capping total prepends keeps the UI (including the rail itself) responsive even on ~150-turn sessions. Load settle raised to 900ms for more breathing room between prepends.
+- **History-as-data architecture (fixes stalls on very long sessions)**: the rail's turn list is now read from the HOST through the browser→host `sessions.history` RPC — every persisted turn (including ones far outside the conversation window) is shown as plain data, paged incrementally, with **zero prepends into the conversation flow on open**. Previously the rail extended the flow window by auto-clicking "Load earlier", which re-renders the whole flow per page and stalled the UI on ~150-turn sessions. Now the flow window is only extended **on demand**: clicking a capsule for a turn already in the window scrolls directly; for a turn outside the window, the rail extends the window page by page (respecting the paging button's in-flight state) until the target turn is in the window, then scrolls and highlights it.
 - **README screenshot**: added `docs/turn-nav-rail.png` to the bilingual README (English default) as marketing, shipped in the npm package.
 
 ## [0.1.0] - 2026-08-19
