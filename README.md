@@ -1,10 +1,10 @@
-# dsh-turn-nav
+# dsh-turn-navigator
 
 An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **turn navigation drawer** to the conversation interface — so you can see every turn at a glance, jump to any turn's start, and know which turn you're currently reading.
 
 ## Why
 
-In the default DSH web UI, finding a specific turn in a long conversation means scrolling — a lot. There's no overview of how many turns happened, what each turn was about, or where the current scroll position sits. `dsh-turn-nav` solves this:
+In the default DSH web UI, finding a specific turn in a long conversation means scrolling — a lot. There's no overview of how many turns happened, what each turn was about, or where the current scroll position sits. `dsh-turn-navigator` solves this:
 
 - A **trigger pill** in the session header shows the turn count.
 - Clicking it opens a **right-side drawer** listing every turn with its index, the user's message summary, and a timestamp.
@@ -14,7 +14,7 @@ In the default DSH web UI, finding a specific turn in a long conversation means 
 ## Installation
 
 ```sh
-dsh plugin --profile web add dsh-turn-nav
+dsh plugin --profile web add dsh-turn-navigator
 ```
 
 Then restart `dsh web`:

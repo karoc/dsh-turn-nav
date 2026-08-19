@@ -1,5 +1,5 @@
 /**
- * dsh-turn-nav host half (Node). No tools, routes, or system prompts — this
+ * dsh-turn-navigator host half (Node). No tools, routes, or system prompts — this
  * plugin is pure client UI (a session-header trigger + an overlay drawer).
  * The empty apply satisfies the cordis bundle contract; the browser half
  * (exports["./client"]) does all the work.

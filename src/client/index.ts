@@ -1,5 +1,5 @@
 /**
- * dsh-turn-nav client plugin: registers two slot entries —
+ * dsh-turn-navigator client plugin: registers two slot entries —
  *   1. `conversation.session.header.utilities` (session scope): a compact
  *      trigger pill that shows the turn count and publishes the turn list to
  *      the module-level relay.
@@ -30,12 +30,12 @@ import './styles.ts'
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The turn-nav drawer copy. */
-    'dsh-turn-nav': TurnNavKey
+    'dsh-turn-navigator': TurnNavKey
   }
 }
 
 /** Dictionary namespace owned by this plugin. */
-const NS = 'dsh-turn-nav'
+const NS = 'dsh-turn-navigator'
 
 /** Required services (cordis fiber inject). */
 export const inject = ['slots', 'locale']
@@ -46,7 +46,7 @@ export const inject = ['slots', 'locale']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-turn-nav: copy dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-turn-navigator: copy dictionaries')
 
   const t = ctx.locale.bind(NS) as (key: TurnNavKey, params?: Record<string, unknown>) => string
 
@@ -54,7 +54,7 @@ export function apply(ctx: ClientContext): void {
   // publishes the turn list (session scope gives useSession).
   ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
     name: 'conversation.session.header.utilities',
-    id: 'dsh-turn-nav',
+    id: 'dsh-turn-navigator',
     order: 20,
     locale: NS,
     inject: (): TriggerInjected => ({
@@ -66,7 +66,7 @@ export function apply(ctx: ClientContext): void {
   // otherwise (root scope gives useSessions; turns arrive via the relay).
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
-    id: 'dsh-turn-nav',
+    id: 'dsh-turn-navigator',
     order: 20,
     locale: NS,
     inject: (): DrawerInjected => ({

@@ -190,4 +190,4 @@ export function injectTurnNavStyles(pluginId: string): void {
 // executes this factory after the DOM head exists, and a module-top-level call
 // is a preserved side effect: the whole module cannot be tree-shaken away
 // leaving a dangling reference.
-injectTurnNavStyles('dsh-turn-nav')
+injectTurnNavStyles('dsh-turn-navigator')

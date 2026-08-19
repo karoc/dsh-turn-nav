@@ -1,5 +1,5 @@
 /**
- * Self-contained tsdown config for the external dsh-turn-nav bundle. Mirrors
+ * Self-contained tsdown config for the external dsh-turn-navigator bundle. Mirrors
  * the repository's `packages/client/tsdown.client.ts` essentials so the built
  * `lib/client.js` speaks the loader's module-table contract
  * (`window.__ModuleLoader__.load({ id, factory })`), with the platform packages
@@ -10,7 +10,7 @@
 
 import { defineConfig } from 'tsdown'
 
-const ID = 'dsh-turn-nav'
+const ID = 'dsh-turn-navigator'
 
 /** Externals answered by the loader module table (platform seed + runtime store exemption). */
 const CLIENT_EXTERNALS: readonly string[] = [
@@ -40,7 +40,7 @@ const node = {
   },
 }
 
-/** Browser client bundle served at /plugins/dsh-turn-nav/client.js. */
+/** Browser client bundle served at /plugins/dsh-turn-navigator/client.js. */
 const client = {
   name: `${ID}/client`,
   entry: { client: 'src/client/index.ts' },

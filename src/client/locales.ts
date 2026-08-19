@@ -1,4 +1,4 @@
-/** Copy dictionaries for the dsh-turn-nav plugin. */
+/** Copy dictionaries for the dsh-turn-navigator plugin. */
 
 /** English strings (the key-set source of truth for this pair). */
 export const en = {

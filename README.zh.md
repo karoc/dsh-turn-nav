@@ -1,10 +1,10 @@
-# dsh-turn-nav
+# dsh-turn-navigator
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 外部插件，为会话界面增加**轮次定位抽屉**——让你一眼纵览整场会话有哪几轮，跳转到任意轮次起始点，并知道当前滚动位置在哪一轮。
 
 ## 为什么需要
 
-DSH Web UI 中，在长会话里找某一轮只能靠滚动——没有轮次概览，不知道有几轮、每轮说了什么、当前滚到哪里。`dsh-turn-nav` 解决这个问题：
+DSH Web UI 中，在长会话里找某一轮只能靠滚动——没有轮次概览，不知道有几轮、每轮说了什么、当前滚到哪里。`dsh-turn-navigator` 解决这个问题：
 
 - 会话头部右侧的**触发胶囊**显示轮次总数。
 - 点击打开**右侧抽屉**，列出每一轮的序号、用户消息摘要和时间戳。
@@ -14,7 +14,7 @@ DSH Web UI 中，在长会话里找某一轮只能靠滚动——没有轮次概
 ## 安装
 
 ```sh
-dsh plugin --profile web add dsh-turn-nav
+dsh plugin --profile web add dsh-turn-navigator
 ```
 
 然后重启 `dsh web`：
