@@ -1,6 +1,6 @@
 {
   "name": "dsh-turn-navigator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "External DeepSeek Harness plugin: a turn-navigation drawer that lists every conversation turn (user message summary + timestamp), jumps to any turn's start, and highlights the current turn as you scroll.",
   "type": "module",
   "main": "lib/index.js",
