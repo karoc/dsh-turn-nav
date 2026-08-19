@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, type ConversationSnapshotLike } from './turns.ts'
@@ -97,6 +98,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => { setTimeout(resolve, ms) })
 }
 
+/** Keep the jump-feedback bubble inside the viewport vertically. */
+function clampFeedbackY(y: number): number {
+  return Math.max(24, Math.min(y, window.innerHeight - 24))
+}
+
 /** Tooltip body for one turn: index, time, full summary. */
 function tooltipText(entry: RailTurn, t: (key: TurnNavKey, params?: Record<string, unknown>) => string): string {
   const time = formatTime(entry.startTime)
@@ -135,6 +141,9 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
   const [tipTop, setTipTop] = useState(0)
   const [canScrollUp, setCanScrollUp] = useState(false)
   const [canScrollDown, setCanScrollDown] = useState(false)
+  // On-demand jump feedback: which turn is being located (or failed), and the
+  // vertical position to anchor the feedback bubble next to.
+  const [jumpState, setJumpState] = useState<{ turn: number; y: number; phase: 'loading' | 'error' } | null>(null)
   const railRef = useRef<HTMLDivElement | null>(null)
   const tipRef = useRef<HTMLDivElement | null>(null)
   const hoverScrollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -236,9 +245,11 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
   // Expand the conversation window until a given turn is inside it, then jump.
   // This is the ONLY path that prepends into the flow — it runs on demand,
   // only when the user clicks a capsule for a turn outside the window.
-  const jumpToTurn = async (turn: number): Promise<void> => {
+  // Resolves true on success (scrolled + highlighted), false if the target
+  // could not be reached.
+  const jumpToTurn = async (turn: number): Promise<boolean> => {
     const scrollport = findScrollport()
-    if (scrollport === undefined) return
+    if (scrollport === undefined) return false
 
     // Ensure the target turn is inside the window (extend if not).
     const inWindow = snapshotRef.current?.chat.timeline.turnOrder.includes(turn) === true
@@ -253,22 +264,39 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
         btn.click()
         await sleep(LOAD_RENDER_SETTLE_MS)
       }
-      if (!extended) return
+      if (!extended) return false
     }
 
     // Locate the turn's first node and scroll to it.
     const snap = snapshotRef.current
-    if (snap === undefined) return
+    if (snap === undefined) return false
     const key = firstNodeKeyOfTurn(snap, turn)
-    if (key === undefined) return
+    if (key === undefined) return false
     const row = scrollport.querySelector<HTMLElement>(`[${ANCHOR_ATTR}="${CSS.escape(key)}"]`)
-    if (row === null) return
+    if (row === null) return false
     const targetTop = row.getBoundingClientRect().top - scrollport.getBoundingClientRect().top + scrollport.scrollTop
     scrollport.scrollTop = Math.max(0, targetTop - JUMP_MARGIN_PX)
 
     // Temporary highlight flash.
     row.classList.add(HIGHLIGHT_CLASS)
     setTimeout(() => row.classList.remove(HIGHLIGHT_CLASS), 1500)
+    return true
+  }
+
+  // Click handler: give immediate feedback (capsule pulse + "locating…"
+  // bubble), run the (possibly multi-page) jump, then clear or report failure.
+  const handleCapsuleClick = (turn: number, index: number, e: ReactMouseEvent): void => {
+    centerCapsule(index)
+    const y = e.currentTarget.getBoundingClientRect().top + e.currentTarget.getBoundingClientRect().height / 2
+    setJumpState({ turn, y, phase: 'loading' })
+    void jumpToTurn(turn).then((ok) => {
+      if (ok) {
+        setJumpState(null)
+      } else {
+        setJumpState({ turn, y, phase: 'error' })
+        setTimeout(() => setJumpState(null), 2500)
+      }
+    })
   }
 
   if (turns.length === 0) return null
@@ -291,20 +319,18 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
         {turns.map((entry, i) => {
           const dist = hoverIndex === -1 ? Infinity : Math.abs(i - hoverIndex)
           const cls = dist === 0 ? ' tn-cap-hot' : dist === 1 ? ' tn-cap-warm' : ''
+          const loading = jumpState !== null && jumpState.phase === 'loading' && jumpState.turn === entry.turn
           return (
             <button
               key={entry.turn}
               type="button"
-              className={`tn-cap-btn${cls}`}
+              className={`tn-cap-btn${cls}${loading ? ' tn-loading' : ''}`}
               onMouseEnter={(e) => {
                 setHoverIndex(i)
                 const rect = e.currentTarget.getBoundingClientRect()
                 setHoverY(rect.top + rect.height / 2)
               }}
-              onClick={() => {
-                void jumpToTurn(entry.turn)
-                centerCapsule(i)
-              }}
+              onClick={(e) => handleCapsuleClick(entry.turn, i, e)}
               aria-label={tooltipText(entry, t).replace(/\n/g, ' — ')}
             >
               <span className="tn-cap" />
@@ -324,6 +350,22 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
       >
         <IconChevronDownOutline14 size={12} />
       </button>
+      {/* On-demand jump feedback: "locating turn N…" bubble next to the clicked
+          capsule while the window is being extended, or a brief failure notice.
+          Portal to body so it stays viewport-fixed. */}
+      {jumpState !== null && createPortal(
+        <div
+          className={`tn-jump-feedback${jumpState.phase === 'error' ? ' tn-jump-error' : ''}`}
+          style={{ top: clampFeedbackY(jumpState.y) }}
+          role="status"
+          aria-live="polite"
+        >
+          {jumpState.phase === 'loading'
+            ? t('locatingTurn', { n: String(jumpState.turn) })
+            : t('locateFailed', { n: String(jumpState.turn) })}
+        </div>,
+        document.body,
+      )}
       {/* Custom tooltip bubble anchored to the LEFT of the rail. Rendered via
           a portal to document.body so it stays position:fixed relative to the
           VIEWPORT — being a child of .tn-wrap (which has a transform) would

@@ -137,6 +137,53 @@ export const TURN_NAV_STYLES = `
   from { opacity: 0; }
 }
 
+/* On-demand jump feedback: a bubble to the LEFT of the rail showing that a
+   turn is being located (loading, with a pulsing dot) or that locating
+   failed. Mirrors the tooltip visual but with a status dot. */
+.tn-jump-feedback {
+  position: fixed;
+  right: 40px;
+  transform: translateY(-50%);
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-static-neutral-bluish-00);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  max-width: 45vw;
+  pointer-events: none;
+  animation: tn-tooltip-in 150ms var(--ds-ease-in-out);
+}
+.tn-jump-feedback::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: tn-loading-pulse 1s ease-in-out infinite;
+}
+.tn-jump-feedback.tn-jump-error {
+  color: var(--dsw-alias-state-error-primary);
+}
+.tn-jump-feedback.tn-jump-error::before {
+  background: var(--dsw-alias-state-error-primary);
+  animation: none;
+}
+/* The clicked capsule pulses while its turn is being located. */
+.tn-cap-btn.tn-loading .tn-cap {
+  animation: tn-loading-pulse 900ms ease-in-out infinite;
+}
+@keyframes tn-loading-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
 /* Jump highlight flash on the target row in the conversation flow. */
 @keyframes tn-highlight-flash {
   0% { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 26%, transparent); }

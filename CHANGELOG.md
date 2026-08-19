@@ -5,6 +5,7 @@
 ### Changed
 
 - **History-as-data architecture (fixes stalls on very long sessions)**: the rail's turn list is now read from the HOST through the browser→host `sessions.history` RPC — every persisted turn (including ones far outside the conversation window) is shown as plain data, paged incrementally, with **zero prepends into the conversation flow on open**. Previously the rail extended the flow window by auto-clicking "Load earlier", which re-renders the whole flow per page and stalled the UI on ~150-turn sessions. Now the flow window is only extended **on demand**: clicking a capsule for a turn already in the window scrolls directly; for a turn outside the window, the rail extends the window page by page (respecting the paging button's in-flight state) until the target turn is in the window, then scrolls and highlights it.
+- **Immediate jump feedback**: clicking an out-of-window capsule now shows instant feedback — the clicked capsule pulses and a "Locating turn N…" bubble appears beside it (in the DSH tooltip visual style) for the whole duration of the on-demand window extension; on failure a brief "Could not locate turn N" notice shows instead. No more silent waits.
 - **README screenshot**: added `docs/turn-nav-rail.png` to the bilingual README (English default) as marketing, shipped in the npm package.
 
 ## [0.1.0] - 2026-08-19
