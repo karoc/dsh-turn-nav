@@ -251,36 +251,52 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
     const scrollport = findScrollport()
     if (scrollport === undefined) return false
 
-    // Ensure the target turn is inside the window (extend if not).
-    const inWindow = snapshotRef.current?.chat.timeline.turnOrder.includes(turn) === true
-    if (!inWindow) {
-      let extended = false
-      for (let i = 0; i < MAX_JUMP_PAGES; i += 1) {
-        const snap = snapshotRef.current
-        if (snap !== undefined && snap.chat.timeline.turnOrder.includes(turn)) { extended = true; break }
-        const btn = findLoadOlderButton()
-        if (btn === null) break // no more history — target unreachable
-        if (btn.disabled) { await sleep(150); continue }
-        btn.click()
-        await sleep(LOAD_RENDER_SETTLE_MS)
-      }
-      if (!extended) return false
+    // Jumping to the OLDEST turn must load history to the very beginning
+    // (hasMore false) — otherwise the window can include the target's boundary
+    // while earlier (non-turn or older) events are still pending, and the user
+    // lands before the true first turn with a "Load earlier" button remaining.
+    const isOldest = turns[0]?.turn === turn
+
+    // Expand the window (on demand) until the target turn's first row is
+    // actually rendered in the DOM — and, for the oldest turn, until there is
+    // no more history to load — then scroll + highlight.
+    const scrollToRow = (row: HTMLElement): void => {
+      const targetTop = row.getBoundingClientRect().top - scrollport.getBoundingClientRect().top + scrollport.scrollTop
+      scrollport.scrollTop = Math.max(0, targetTop - JUMP_MARGIN_PX)
+      row.classList.add(HIGHLIGHT_CLASS)
+      setTimeout(() => row.classList.remove(HIGHLIGHT_CLASS), 1500)
     }
 
-    // Locate the turn's first node and scroll to it.
-    const snap = snapshotRef.current
-    if (snap === undefined) return false
-    const key = firstNodeKeyOfTurn(snap, turn)
-    if (key === undefined) return false
-    const row = scrollport.querySelector<HTMLElement>(`[${ANCHOR_ATTR}="${CSS.escape(key)}"]`)
-    if (row === null) return false
-    const targetTop = row.getBoundingClientRect().top - scrollport.getBoundingClientRect().top + scrollport.scrollTop
-    scrollport.scrollTop = Math.max(0, targetTop - JUMP_MARGIN_PX)
+    for (let i = 0; i < MAX_JUMP_PAGES; i += 1) {
+      const snap = snapshotRef.current
+      const key = snap === undefined ? undefined : firstNodeKeyOfTurn(snap, turn)
+      const row = key === undefined
+        ? null
+        : scrollport.querySelector<HTMLElement>(`[${ANCHOR_ATTR}="${CSS.escape(key)}"]`)
 
-    // Temporary highlight flash.
-    row.classList.add(HIGHLIGHT_CLASS)
-    setTimeout(() => row.classList.remove(HIGHLIGHT_CLASS), 1500)
-    return true
+      if (row !== null) {
+        const more = findLoadOlderButton()
+        if (!isOldest || more === null) {
+          // Target rendered and (for the oldest turn) history fully loaded.
+          scrollToRow(row)
+          return true
+        }
+      }
+
+      const btn = findLoadOlderButton()
+      if (btn === null) {
+        // No more history: the target must be renderable now.
+        if (row !== null) {
+          scrollToRow(row)
+          return true
+        }
+        return false
+      }
+      if (btn.disabled) { await sleep(150); continue }
+      btn.click()
+      await sleep(LOAD_RENDER_SETTLE_MS)
+    }
+    return false
   }
 
   // Click handler: give immediate feedback (capsule pulse + "locating…"

@@ -1,5 +1,7 @@
 # dsh-turn-navigator
 
+**[English](README.md) · 简体中文**
+
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 外部插件，为会话界面增加**钢琴键式轮次胶囊条**——在会话界面右侧悬浮一条竖向胶囊列，每轮一个小胶囊，让你一眼纵览整场会话有哪几轮，悬停预览，点击跳转到任意轮次起始点。
 
 ![轮次导航胶囊条](docs/turn-nav-rail.png)

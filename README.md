@@ -1,5 +1,7 @@
 # dsh-turn-navigator
 
+**English · [简体中文](README.zh.md)**
+
 An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **piano-key turn rail** to the conversation interface — a vertical column of tiny capsules on the right edge of the conversation, one per turn, so you can see every turn at a glance, hover to preview it, and click to jump to its start.
 
 ![Turn navigation rail](docs/turn-nav-rail.png)
