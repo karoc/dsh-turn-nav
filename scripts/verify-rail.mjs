@@ -15,7 +15,10 @@ async function main() {
   await page.waitForTimeout(6000)
   await page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll('[class*="sessionRow"]'))
-    const target = rows.find((r) => (r.textContent || '').includes('插件-看板'))
+    const target = rows.find((r) => {
+      const t = (r.textContent || '').trim()
+      return !t.startsWith('New Session') && t.length > 3
+    })
     if (target) target.click()
   })
   await page.waitForTimeout(7000)

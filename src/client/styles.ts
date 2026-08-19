@@ -23,7 +23,9 @@ export const TURN_NAV_STYLES = `
   z-index: 30;
   pointer-events: auto;
 }
-/* Up/down scroll controls at the top and bottom of the rail. */
+/* Up/down scroll controls at the top and bottom of the rail. Disabled (grey,
+   no pointer/hover-scroll) when there is nothing to scroll in that
+   direction. */
 .tn-scroll-btn {
   flex: none;
   width: 26px;
@@ -38,19 +40,27 @@ export const TURN_NAV_STYLES = `
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
 }
-.tn-scroll-btn:hover {
+.tn-scroll-btn:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
 }
-/* Rail: fixed-size vertical column with a hard height cap and internal
-   scroll. The scrollbar is HIDDEN (scrollbar-width:none + webkit) so its
-   appear/disappear never shifts layout; scrolling is via wheel over the
-   rail, the up/down buttons, or the rail-top auto-load. Buttons are packed
-   flush (no gap) so hovering slides continuously without dead zones. */
+.tn-scroll-btn:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  opacity: 0.45;
+  cursor: default;
+}
+/* Rail: FIXED-height vertical column (regardless of turn count) with a hard
+   cap and internal scroll — the rail keeps one constant length and the turns
+   are viewed by scrolling. The scrollbar is HIDDEN
+   (scrollbar-width:none + webkit) so its appear/disappear never shifts
+   layout; scrolling is via wheel over the rail, the up/down buttons (click or
+   hover-hold), or the rail-top auto-load. Buttons are packed flush (no gap)
+   so hovering slides continuously without dead zones. */
 .tn-rail {
   display: flex;
   flex-direction: column;
   width: 26px;
+  height: 60vh;
   max-height: 60vh;
   overflow-y: auto;
   overflow-x: hidden;
@@ -79,14 +89,15 @@ export const TURN_NAV_STYLES = `
   outline: none;
 }
 /* The visible capsule itself: grey, ~3px tall, ~12px wide by default. The
-   hover widening uses transform:scaleX (NOT width), so it never reflows the
-   rail or adds a horizontal scrollbar — no layout drift while sliding. */
+   hover widening uses transform:scaleX (NOT width) with transform-origin on
+   the RIGHT, so it grows LEFTWARD only (right-aligned — the right edge never
+   moves), never reflows the rail or adds a horizontal scrollbar. */
 .tn-cap {
   width: 12px;
   height: 3px;
   border-radius: 2px;
   background: var(--dsw-alias-border-l3);
-  transform-origin: center;
+  transform-origin: right center;
   transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
   flex: none;
 }
@@ -108,7 +119,6 @@ export const TURN_NAV_STYLES = `
 .tn-tip {
   position: fixed;
   right: 40px; /* rail 26px + wrapper right 6px + 8px gap */
-  transform: translateY(-50%);
   z-index: 100;
   width: max-content;
   max-width: 50vw;

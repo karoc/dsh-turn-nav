@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, type ConversationSnapshotLike, type TurnEntry } from './turns.ts'
 import type { TurnNavKey } from './locales.ts'
@@ -173,9 +174,14 @@ export function TurnNavRail({ useSession, t }: RailProps) {
   const turns = useMemo(() => extractTurns(snapshot), [snapshot])
   const [hoverIndex, setHoverIndex] = useState(-1)
   const [hoverY, setHoverY] = useState(0)
+  const [tipTop, setTipTop] = useState(0)
+  const [canScrollUp, setCanScrollUp] = useState(false)
+  const [canScrollDown, setCanScrollDown] = useState(false)
   const autoPagesRef = useRef(0)
   const loadBusyRef = useRef(false)
   const railRef = useRef<HTMLDivElement | null>(null)
+  const tipRef = useRef<HTMLDivElement | null>(null)
+  const hoverScrollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Load one page of older history with a busy lock + render settle. Shared by
   // the initial auto-load loop and the rail-top scroll trigger, so the two
@@ -217,6 +223,7 @@ export function TurnNavRail({ useSession, t }: RailProps) {
       const rail = railRef.current
       // Stop once the rail is visually full (content taller than its box).
       if (rail !== null && rail.scrollHeight > rail.clientHeight + 2) return
+      if (findLoadOlderButton() === null) return // no more history — stop
       loadMoreOnce((loaded) => {
         if (loaded) autoPagesRef.current += 1
         if (!stopped) timer = setTimeout(tick, 300)
@@ -257,18 +264,97 @@ export function TurnNavRail({ useSession, t }: RailProps) {
     return () => rail.removeEventListener('scroll', onScroll)
   }, [hasTurns])
 
-  if (turns.length === 0) return null
+  // Track whether there is more content above/below the rail's viewport, to
+  // enable/disable the scroll buttons. Re-evaluates on rail scroll and on any
+  // turn-list change (loading, prepends, new turns).
+  useEffect(() => {
+    const rail = railRef.current
+    if (rail === null) return
+    const update = (): void => {
+      setCanScrollUp(rail.scrollTop > 2)
+      setCanScrollDown(rail.scrollTop < rail.scrollHeight - rail.clientHeight - 2)
+    }
+    update()
+    rail.addEventListener('scroll', update, { passive: true })
+    // Also re-evaluate when turns change (content grows/shrinks).
+    const ro = new ResizeObserver(update)
+    ro.observe(rail)
+    return () => {
+      rail.removeEventListener('scroll', update)
+      ro.disconnect()
+    }
+  }, [turns.length])
 
   const hoverEntry = hoverIndex >= 0 ? turns[hoverIndex] : undefined
 
+  // Position the tooltip bubble vertically centered on the hovered capsule,
+  // clamped so the WHOLE bubble stays inside the viewport (a tall bubble must
+  // not run off the bottom). Measured after render so the real height is used.
+  useEffect(() => {
+    if (hoverEntry === undefined) return
+    const tip = tipRef.current
+    if (tip === null) return
+    const h = tip.offsetHeight
+    setTipTop(Math.max(8, Math.min(hoverY - h / 2, window.innerHeight - h - 8)))
+  }, [hoverEntry, hoverY])
+
+  // Stop any hover-driven auto-scroll on unmount.
+  useEffect(() => () => stopHoverScroll(), [])
+
+  // Hover-driven auto-scroll on the up/down buttons: while the pointer rests
+  // on an enabled button, scroll continuously until it is disabled or the
+  // pointer leaves.
+  const startHoverScroll = (dir: 1 | -1): void => {
+    stopHoverScroll()
+    const rail = railRef.current
+    if (rail === null) return
+    const step = () => {
+      const r = railRef.current
+      if (r === null) return
+      // Stop once this direction has no more content.
+      if (dir < 0 && r.scrollTop <= 2) { stopHoverScroll(); return }
+      if (dir > 0 && r.scrollTop >= r.scrollHeight - r.clientHeight - 2) { stopHoverScroll(); return }
+      r.scrollBy({ top: dir * 24 })
+    }
+    step()
+    hoverScrollRef.current = setInterval(step, 120)
+  }
+
+  function stopHoverScroll(): void {
+    if (hoverScrollRef.current !== null) {
+      clearInterval(hoverScrollRef.current)
+      hoverScrollRef.current = null
+    }
+  }
+
+  // Center the activated capsule in the rail (except when it is the first or
+  // last turn — those naturally sit at the edges).
+  const centerCapsule = (index: number): void => {
+    const rail = railRef.current
+    if (rail === null) return
+    const btn = rail.querySelectorAll<HTMLElement>('.tn-cap-btn')[index]
+    if (btn === undefined) return
+    const railRect = rail.getBoundingClientRect()
+    const btnRect = btn.getBoundingClientRect()
+    const contentTop = railRect.top - rail.scrollTop
+    const btnContentTop = btnRect.top - contentTop
+    const target = btnContentTop - (rail.clientHeight - btnRect.height) / 2
+    rail.scrollTop = Math.max(0, target)
+  }
+
+  if (turns.length === 0) return null
+
   return (
-    <div className="tn-wrap" role="navigation" aria-label={t('rail')} onMouseLeave={() => setHoverIndex(-1)}>
+    <div className="tn-wrap" role="navigation" aria-label={t('rail')} onMouseLeave={() => { setHoverIndex(-1); stopHoverScroll() }}>
       {/* Scroll-up control at the top of the rail. */}
       <button
         type="button"
         className="tn-scroll-btn"
         aria-label="scroll rail up"
+        disabled={!canScrollUp}
         onClick={() => scrollRail(railRef.current, -1)}
+        onMouseEnter={() => { if (canScrollUp) startHoverScroll(-1) }}
+        onMouseLeave={stopHoverScroll}
       >
         <IconChevronUpOutline14 size={12} />
       </button>
@@ -286,7 +372,10 @@ export function TurnNavRail({ useSession, t }: RailProps) {
                 const rect = e.currentTarget.getBoundingClientRect()
                 setHoverY(rect.top + rect.height / 2)
               }}
-              onClick={() => void jumpToTurn(snapshot, entry.turn)}
+              onClick={() => {
+                void jumpToTurn(snapshot, entry.turn)
+                centerCapsule(i)
+              }}
               aria-label={tooltipText(entry, entry.index, t).replace(/\n/g, ' — ')}
             >
               <span className="tn-cap" />
@@ -299,17 +388,22 @@ export function TurnNavRail({ useSession, t }: RailProps) {
         type="button"
         className="tn-scroll-btn"
         aria-label="scroll rail down"
+        disabled={!canScrollDown}
         onClick={() => scrollRail(railRef.current, 1)}
+        onMouseEnter={() => { if (canScrollDown) startHoverScroll(1) }}
+        onMouseLeave={stopHoverScroll}
       >
         <IconChevronDownOutline14 size={12} />
       </button>
-      {/* Custom tooltip bubble anchored to the LEFT of the rail (the rail hugs
-          the viewport's right edge, so a right-side bubble would fall outside
-          the browser window). Fixed position, dsh tooltip visual style. */}
-      {hoverEntry !== undefined && (
-        <div className="tn-tip" style={{ top: clampY(hoverY) }} role="tooltip">
+      {/* Custom tooltip bubble anchored to the LEFT of the rail. Rendered via
+          a portal to document.body so it stays position:fixed relative to the
+          VIEWPORT — being a child of .tn-wrap (which has a transform) would
+          make the wrapper the containing block and misplace it. */}
+      {hoverEntry !== undefined && createPortal(
+        <div ref={tipRef} className="tn-tip" style={{ top: tipTop }} role="tooltip">
           {tooltipText(hoverEntry, hoverEntry.index, t)}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
@@ -320,10 +414,4 @@ function scrollRail(rail: HTMLDivElement | null, dir: 1 | -1): void {
   if (rail === null) return
   const step = Math.max(60, rail.clientHeight * 0.8)
   rail.scrollBy({ top: dir * step, behavior: 'smooth' })
-}
-
-/** Keep the tooltip bubble's center inside the viewport vertically. */
-function clampY(y: number): number {
-  const margin = 30
-  return Math.max(margin, Math.min(y, window.innerHeight - margin))
 }
