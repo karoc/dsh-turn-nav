@@ -11,8 +11,10 @@
 export const TURN_NAV_STYLES = `
 /* Rail: fixed vertical column on the right edge, centered vertically, with a
    hard height cap and internal scroll — a long conversation must never push
-   the rail past the viewport. Each turn is a fixed-size hotspot; once the
-   rail is full it scrolls. */
+   the rail past the viewport. The whole rail is pointer-events:auto so the
+   wheel scrolls the rail anywhere on it (including the gaps between turns);
+   a fixed width + overflow-x:hidden keeps it from ever gaining a horizontal
+   scrollbar. */
 .tn-rail {
   position: fixed;
   right: 6px;
@@ -21,20 +23,21 @@ export const TURN_NAV_STYLES = `
   display: flex;
   flex-direction: column;
   gap: 3px;
+  width: 26px;
   max-height: 60vh;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
   z-index: 30;
-  pointer-events: none; /* the column is only a layout box; buttons opt in */
+  pointer-events: auto;
 }
 /* Per-turn hotspot: a wider/taller transparent button so the tiny capsule
    still has a comfortable hover/click target. Fixed size — excess turns make
    the rail scroll, they never compress it. */
 .tn-cap-btn {
-  pointer-events: auto;
   flex: none;
   min-height: 10px;
-  width: 26px;
+  width: 100%;
   padding: 0;
   border: none;
   background: transparent;
@@ -44,27 +47,29 @@ export const TURN_NAV_STYLES = `
   justify-content: center;
   outline: none;
 }
-/* The visible capsule itself: grey, ~3px tall, ~12px wide by default. */
+/* The visible capsule itself: grey, ~3px tall, ~12px wide by default. The
+   hover widening uses transform:scaleX (NOT width), so it never reflows the
+   rail or adds a horizontal scrollbar — no layout drift while sliding. */
 .tn-cap {
   width: 12px;
   height: 3px;
   border-radius: 2px;
   background: var(--dsw-alias-border-l3);
-  transition: width 160ms ease, background 160ms ease, border-radius 160ms ease, box-shadow 160ms ease;
+  transform-origin: center;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
   flex: none;
 }
-/* Hovered capsule: glow WHITE and widen to 150% (the wave peak). Fixed white,
-   theme-independent (label tokens flip dark in light themes). */
+/* Hovered capsule: glow with the theme's primary label color and widen 150%
+   (the wave peak). Theme-following (dark theme = white, light theme = dark). */
 .tn-cap-btn.tn-cap-hot .tn-cap {
-  width: 18px;
-  border-radius: 3px;
-  background: #ffffff;
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+  transform: scaleX(1.5);
+  background: var(--dsw-alias-label-primary);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--dsw-alias-label-primary) 55%, transparent);
 }
 /* Adjacent capsule: slightly wider (125%) — the wave's near neighbours. */
 .tn-cap-btn.tn-cap-warm .tn-cap {
-  width: 15px;
-  background: var(--dsw-alias-border-l2);
+  transform: scaleX(1.25);
+  background: var(--dsw-alias-label-secondary);
 }
 
 /* Jump highlight flash on the target row in the conversation flow. */

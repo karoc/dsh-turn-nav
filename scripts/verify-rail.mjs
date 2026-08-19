@@ -58,11 +58,16 @@ async function main() {
     const hot = btns.find((b) => b.classList.contains('tn-cap-hot'))?.querySelector('.tn-cap')
     const warm = btns.find((b) => b.classList.contains('tn-cap-warm'))?.querySelector('.tn-cap')
     const plain = btns.find((b) => !b.classList.contains('tn-cap-hot') && !b.classList.contains('tn-cap-warm'))?.querySelector('.tn-cap')
-    const w = (el) => (el ? Math.round(parseFloat(getComputedStyle(el).width)) : null)
+    const scale = (el) => {
+      if (!el) return null
+      const m = new DOMMatrixReadOnly(getComputedStyle(el).transform)
+      return Math.round(m.a * 100) / 100
+    }
     const bg = (el) => (el ? getComputedStyle(el).backgroundColor : null)
-    return { hotW: w(hot), hotBg: bg(hot), warmW: w(warm), plainW: w(plain) }
+    // Width is unchanged (transform-only widening) — check the base width too.
+    return { hotScale: scale(hot), hotBg: bg(hot), warmScale: scale(warm), plainScale: scale(plain) }
   })
-  console.log('2. wave widen+white:', JSON.stringify(wave))
+  console.log('2. wave (scaleX + theme bg):', JSON.stringify(wave))
 
   // 3. Rail-top scroll → load remaining history to the end.
   // First confirm there IS more history (load button present), then scroll.

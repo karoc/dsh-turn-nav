@@ -7,7 +7,7 @@ An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 
 In the default DSH web UI, finding a specific turn in a long conversation means scrolling — a lot. There's no overview of how many turns happened, what each turn was about, or where the current scroll position sits. `dsh-turn-navigator` solves this with a minimap-style rail:
 
 - A **vertical capsule per turn** floats on the right edge of the conversation (grey, ~3px tall, piano-key style).
-- **Hovering** a capsule makes it glow white and grow — with the two neighbouring capsules slightly raised too, so sliding across the rail ripples like a wave — and shows the full turn info (index, timestamp, user-message summary) in a native DSH tooltip.
+- **Hovering** a capsule makes it glow with the theme's primary label color and widen to 150% (the two neighbours widen to 125% too), so sliding across the rail ripples like a wave — and shows the full turn info (index, timestamp, user-message summary) in a native DSH tooltip.
 - **Clicking** a capsule scrolls the conversation to that turn's start and briefly highlights it.
 - **Older history auto-loads**: the conversation paginates its window; the plugin keeps loading earlier pages so every turn is reachable, with no manual "Load earlier" clicks.
 
@@ -27,7 +27,7 @@ dsh web
 
 1. Open any conversation with at least one completed turn.
 2. A vertical rail of grey capsules appears on the right edge of the conversation (one capsule per turn). The rail is height-capped (60vh) and scrolls internally, so a very long conversation never pushes it past the viewport.
-3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH tooltip (the capsule glows white and widens 150% — the two neighbours widen a little too, a wave ripple across the rail).
+3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH tooltip (the capsule glows with the theme color and widens 150% — the two neighbours widen a little too, a wave ripple across the rail).
 4. Click a capsule to jump to that turn's start; the target row briefly highlights.
 5. Older history loads automatically — the rail fills its visible height first, and scrolling the rail to its top keeps loading earlier turns. No manual "Load earlier" clicks needed.
 
