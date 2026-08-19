@@ -26,8 +26,8 @@ dsh web
 ## Usage
 
 1. Open any conversation with at least one completed turn.
-2. A vertical rail of grey capsules appears on the right edge of the conversation (one capsule per turn). The rail is height-capped (60vh) and scrolls internally, so a very long conversation never pushes it past the viewport.
-3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH tooltip (the capsule glows with the theme color and widens 150% — the two neighbours widen a little too, a wave ripple across the rail).
+2. A vertical rail of grey capsules appears on the right edge of the conversation (one capsule per turn). The rail is height-capped (60vh), scrolls internally with a **hidden scrollbar** (no layout jitter), and has **up/down scroll buttons** at its top and bottom — so a very long conversation never pushes it past the viewport, and you can wheel or click to move through the turns.
+3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH-style tooltip anchored to the left of the rail (the capsule glows with the theme color and widens 150% — the two neighbours widen a little too, a wave ripple across the rail).
 4. Click a capsule to jump to that turn's start; the target row briefly highlights.
 5. Older history loads automatically — the rail fills its visible height first, and scrolling the rail to its top keeps loading earlier turns. No manual "Load earlier" clicks needed.
 

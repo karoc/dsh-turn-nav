@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, type ConversationSnapshotLike, type TurnEntry } from './turns.ts'
 import type { TurnNavKey } from './locales.ts'
 
@@ -172,6 +172,7 @@ export function TurnNavRail({ useSession, t }: RailProps) {
   const snapshot = useSession?.((s: ConversationSnapshotLike) => s)
   const turns = useMemo(() => extractTurns(snapshot), [snapshot])
   const [hoverIndex, setHoverIndex] = useState(-1)
+  const [hoverY, setHoverY] = useState(0)
   const autoPagesRef = useRef(0)
   const loadBusyRef = useRef(false)
   const railRef = useRef<HTMLDivElement | null>(null)
@@ -258,31 +259,71 @@ export function TurnNavRail({ useSession, t }: RailProps) {
 
   if (turns.length === 0) return null
 
+  const hoverEntry = hoverIndex >= 0 ? turns[hoverIndex] : undefined
+
   return (
-    <div ref={railRef} className="tn-rail" role="navigation" aria-label={t('rail')}>
-      {turns.map((entry, i) => {
-        const dist = hoverIndex === -1 ? Infinity : Math.abs(i - hoverIndex)
-        const cls = dist === 0 ? ' tn-cap-hot' : dist === 1 ? ' tn-cap-warm' : ''
-        return (
-          <Tooltip
-            key={entry.turn}
-            label={() => tooltipText(entry, entry.index, t)}
-            side="right"
-            delayMs={150}
-          >
+    <div className="tn-wrap" role="navigation" aria-label={t('rail')} onMouseLeave={() => setHoverIndex(-1)}>
+      {/* Scroll-up control at the top of the rail. */}
+      <button
+        type="button"
+        className="tn-scroll-btn"
+        aria-label="scroll rail up"
+        onClick={() => scrollRail(railRef.current, -1)}
+      >
+        <IconChevronUpOutline14 size={12} />
+      </button>
+      <div ref={railRef} className="tn-rail">
+        {turns.map((entry, i) => {
+          const dist = hoverIndex === -1 ? Infinity : Math.abs(i - hoverIndex)
+          const cls = dist === 0 ? ' tn-cap-hot' : dist === 1 ? ' tn-cap-warm' : ''
+          return (
             <button
+              key={entry.turn}
               type="button"
               className={`tn-cap-btn${cls}`}
-              onMouseEnter={() => setHoverIndex(i)}
-              onMouseLeave={() => setHoverIndex(-1)}
+              onMouseEnter={(e) => {
+                setHoverIndex(i)
+                const rect = e.currentTarget.getBoundingClientRect()
+                setHoverY(rect.top + rect.height / 2)
+              }}
               onClick={() => void jumpToTurn(snapshot, entry.turn)}
               aria-label={tooltipText(entry, entry.index, t).replace(/\n/g, ' — ')}
             >
               <span className="tn-cap" />
             </button>
-          </Tooltip>
-        )
-      })}
+          )
+        })}
+      </div>
+      {/* Scroll-down control at the bottom of the rail. */}
+      <button
+        type="button"
+        className="tn-scroll-btn"
+        aria-label="scroll rail down"
+        onClick={() => scrollRail(railRef.current, 1)}
+      >
+        <IconChevronDownOutline14 size={12} />
+      </button>
+      {/* Custom tooltip bubble anchored to the LEFT of the rail (the rail hugs
+          the viewport's right edge, so a right-side bubble would fall outside
+          the browser window). Fixed position, dsh tooltip visual style. */}
+      {hoverEntry !== undefined && (
+        <div className="tn-tip" style={{ top: clampY(hoverY) }} role="tooltip">
+          {tooltipText(hoverEntry, hoverEntry.index, t)}
+        </div>
+      )}
     </div>
   )
+}
+
+/** Scroll the rail by roughly one viewport-height (smooth). */
+function scrollRail(rail: HTMLDivElement | null, dir: 1 | -1): void {
+  if (rail === null) return
+  const step = Math.max(60, rail.clientHeight * 0.8)
+  rail.scrollBy({ top: dir * step, behavior: 'smooth' })
+}
+
+/** Keep the tooltip bubble's center inside the viewport vertically. */
+function clampY(y: number): number {
+  const margin = 30
+  return Math.max(margin, Math.min(y, window.innerHeight - margin))
 }

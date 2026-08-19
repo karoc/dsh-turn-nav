@@ -9,27 +9,58 @@
  * ripples like a wave (hot = hovered, warm = adjacent). Height stays ~3px.
  */
 export const TURN_NAV_STYLES = `
-/* Rail: fixed vertical column on the right edge, centered vertically, with a
-   hard height cap and internal scroll — a long conversation must never push
-   the rail past the viewport. The whole rail is pointer-events:auto so the
-   wheel scrolls the rail anywhere on it (including the gaps between turns);
-   a fixed width + overflow-x:hidden keeps it from ever gaining a horizontal
-   scrollbar. */
-.tn-rail {
+/* Wrapper: fixed column on the right edge (scroll buttons + rail + tooltip).
+   The whole wrapper is pointer-events:auto so the wheel scrolls the rail
+   anywhere on it; buttons sit above and below the rail. */
+.tn-wrap {
   position: fixed;
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  z-index: 30;
+  pointer-events: auto;
+}
+/* Up/down scroll controls at the top and bottom of the rail. */
+.tn-scroll-btn {
+  flex: none;
+  width: 26px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.tn-scroll-btn:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+/* Rail: fixed-size vertical column with a hard height cap and internal
+   scroll. The scrollbar is HIDDEN (scrollbar-width:none + webkit) so its
+   appear/disappear never shifts layout; scrolling is via wheel over the
+   rail, the up/down buttons, or the rail-top auto-load. Buttons are packed
+   flush (no gap) so hovering slides continuously without dead zones. */
+.tn-rail {
+  display: flex;
+  flex-direction: column;
   width: 26px;
   max-height: 60vh;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  z-index: 30;
-  pointer-events: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tn-rail::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 /* Per-turn hotspot: a wider/taller transparent button so the tiny capsule
    still has a comfortable hover/click target. Fixed size — excess turns make
@@ -70,6 +101,30 @@ export const TURN_NAV_STYLES = `
 .tn-cap-btn.tn-cap-warm .tn-cap {
   transform: scaleX(1.25);
   background: var(--dsw-alias-label-secondary);
+}
+/* Custom tooltip bubble: mirrors the DSH tooltip visual (dark plate, white
+   text, pre-line for multi-line info), fixed-positioned to the LEFT of the
+   rail so it never falls outside the browser window. */
+.tn-tip {
+  position: fixed;
+  right: 40px; /* rail 26px + wrapper right 6px + 8px gap */
+  transform: translateY(-50%);
+  z-index: 100;
+  width: max-content;
+  max-width: 50vw;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-static-neutral-bluish-00);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+  pointer-events: none;
+  animation: tn-tooltip-in 150ms var(--ds-ease-in-out);
+}
+@keyframes tn-tooltip-in {
+  from { opacity: 0; }
 }
 
 /* Jump highlight flash on the target row in the conversation flow. */
