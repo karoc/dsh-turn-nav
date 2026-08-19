@@ -45,7 +45,7 @@ The plugin registers **one additive slot** — **no DSH source code is modified*
 
 Because the rail is session-scoped, it reads the live `ConversationSnapshot` straight from the framework `useSession` kit and renders as `position: fixed` (so it does not occupy the header's flex row).
 
-- **Turn extraction**: `chat.timeline.turnOrder` + `turns` map for boundaries; `chat.locations.getTurn(turn)` for each turn's node keys; the first `kind === 'user'` node's first text block for the summary; `turnTimings` for the timestamp. Turns without a user message fall back to their first node's kind.
+- **Turn extraction**: the rail's full turn list comes from the browser→host `sessions.history` RPC (paged, incremental) — every persisted turn is derived as data (`turn/start` / `user/message` / `turn/end` events → turn number, timestamp, first user-message summary), including turns far outside the conversation window. The live window snapshot (`useSession` → `chat.timeline.turnOrder`) supplements the newest still-running turns. Turns without a user message fall back to their first node's kind.
 - **Jump-to-turn**: locate the turn's first chat-node key, find the DOM row via `data-chat-anchor-key="<key>"`, compute its position in the `[data-conversation-scroll]` scrollport, and set `scrollTop` precisely (more predictable than `scrollIntoView`). If the target row is not yet rendered (older page not loaded), it auto-clicks the "Load earlier" button and retries until the row appears — no "scroll once first" friction.
 - **History-as-data (no flow prepends on open)**: the conversation window only materializes a page of events as DOM, and extending it (`loadOlder`) re-renders the whole flow — expensive on long sessions. The rail instead reads the full persisted history through the browser→host `sessions.history` RPC (paged, incremental) and derives every turn as plain data, so opening a session never touches the flow DOM. **On demand**: clicking a capsule for a turn already in the window scrolls to it directly; for a turn outside the window, the rail extends the window page by page (clicking the "Load earlier" paging button, respecting its in-flight state) until that turn is in the window, then scrolls and highlights it — the only path that prepends into the flow, and it runs only when the user clicks.
 
@@ -53,6 +53,7 @@ Because the rail is session-scoped, it reads the live `ConversationSnapshot` str
 
 - DeepSeek Harness (dsh) with the web client (`dsh web`).
 - Requires the `conversation.session.header.utilities` slot declaration (present in current DSH).
+- Coexists with full-screen plugin pages (e.g. the kanban board): the rail sits below their overlay layer, so an open page always covers it.
 
 ## License
 
