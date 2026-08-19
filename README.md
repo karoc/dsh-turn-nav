@@ -1,15 +1,15 @@
 # dsh-turn-navigator
 
-An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **turn navigation drawer** to the conversation interface — so you can see every turn at a glance, jump to any turn's start, and know which turn you're currently reading.
+An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **piano-key turn rail** to the conversation interface — a vertical column of tiny capsules on the right edge of the conversation, one per turn, so you can see every turn at a glance, hover to preview it, and click to jump to its start.
 
 ## Why
 
-In the default DSH web UI, finding a specific turn in a long conversation means scrolling — a lot. There's no overview of how many turns happened, what each turn was about, or where the current scroll position sits. `dsh-turn-navigator` solves this:
+In the default DSH web UI, finding a specific turn in a long conversation means scrolling — a lot. There's no overview of how many turns happened, what each turn was about, or where the current scroll position sits. `dsh-turn-navigator` solves this with a minimap-style rail:
 
-- A **trigger pill** in the session header shows the turn count.
-- Clicking it opens a **right-side drawer** listing every turn with its index, the user's message summary, and a timestamp.
-- Clicking a turn **scrolls the conversation** to that turn's start and briefly highlights it.
-- The **current turn follows** as you scroll the conversation — the matching list item highlights automatically.
+- A **vertical capsule per turn** floats on the right edge of the conversation (grey, ~3px tall, piano-key style).
+- **Hovering** a capsule makes it glow white and grow — with the two neighbouring capsules slightly raised too, so sliding across the rail ripples like a wave — and shows the full turn info (index, timestamp, user-message summary) in a native DSH tooltip.
+- **Clicking** a capsule scrolls the conversation to that turn's start and briefly highlights it.
+- **Older history auto-loads**: the conversation paginates its window; the plugin keeps loading earlier pages so every turn is reachable, with no manual "Load earlier" clicks.
 
 ## Installation
 
@@ -26,27 +26,29 @@ dsh web
 ## Usage
 
 1. Open any conversation with at least one completed turn.
-2. A "轮次 / Turns" pill with a count appears in the session header's right side.
-3. Click it to open the drawer. Click any turn to jump to it. Scroll the conversation and the drawer highlights your current turn.
-4. Click the pill again or the drawer's close button to dismiss.
+2. A vertical rail of grey capsules appears on the right edge of the conversation (one capsule per turn; the rail doubles as a proportional minimap of the whole history).
+3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH tooltip (the capsule glows white and grows — a wave ripple across the rail).
+4. Click a capsule to jump to that turn's start; the target row briefly highlights.
+5. Older turns load automatically — no manual "Load earlier" clicks needed.
 
 ## How it works
 
-The plugin registers two additive slots — **no DSH source code is modified**:
+The plugin registers **one additive slot** — **no DSH source code is modified**:
 
 | Slot | Scope | Role |
 |------|-------|------|
-| `conversation.session.header.utilities` | session | Trigger pill; reads `useSession` to extract turns |
-| `shell.overlay` | root | Right-side drawer; reads turns via a module-level relay |
+| `conversation.session.header.utilities` | session | The floating turn rail; reads `useSession` directly |
 
-The session-scope trigger has access to `useSession` (the live `ConversationSnapshot`); it extracts the turn list from `chat.timeline.turnOrder` + `turnTimings` and publishes it to a module-level observable store. The root-scope drawer reads that store via `useSyncExternalStore` and renders the list.
+Because the rail is session-scoped, it reads the live `ConversationSnapshot` straight from the framework `useSession` kit and renders as `position: fixed` (so it does not occupy the header's flex row).
 
-Jump-to-turn locates the turn's first chat-node key via `chat.locations.getTurn(turn)`, finds the DOM element with `data-chat-anchor-key="<key>"`, and calls `scrollIntoView`. The scroll-follow listener finds the topmost visible `[data-chat-anchor-key]` row and reverse-maps it to a turn number.
+- **Turn extraction**: `chat.timeline.turnOrder` + `turns` map for boundaries; `chat.locations.getTurn(turn)` for each turn's node keys; the first `kind === 'user'` node's first text block for the summary; `turnTimings` for the timestamp. Turns without a user message fall back to their first node's kind.
+- **Jump-to-turn**: locate the turn's first chat-node key, find the DOM row via `data-chat-anchor-key="<key>"`, compute its position in the `[data-conversation-scroll]` scrollport, and set `scrollTop` precisely (more predictable than `scrollIntoView`). If the target row is not yet rendered (older page not loaded), it auto-clicks the "Load earlier" button and retries until the row appears — no "scroll once first" friction.
+- **Auto-load**: while the conversation's `hasMore` paging button ("加载更早 / Load earlier") is present, the rail keeps clicking it (respecting its disabled/in-flight state) until all history is loaded.
 
 ## Compatibility
 
 - DeepSeek Harness (dsh) with the web client (`dsh web`).
-- Requires `conversation.session.header.utilities` and `shell.overlay` slot declarations (present in current DSH).
+- Requires the `conversation.session.header.utilities` slot declaration (present in current DSH).
 
 ## License
 
