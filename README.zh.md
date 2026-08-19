@@ -2,6 +2,8 @@
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 外部插件，为会话界面增加**钢琴键式轮次胶囊条**——在会话界面右侧悬浮一条竖向胶囊列，每轮一个小胶囊，让你一眼纵览整场会话有哪几轮，悬停预览，点击跳转到任意轮次起始点。
 
+![轮次导航胶囊条](docs/turn-nav-rail.png)
+
 ## 为什么需要
 
 DSH Web UI 中，在长会话里找某一轮只能靠滚动——没有轮次概览，不知道有几轮、每轮说了什么、当前滚到哪里。`dsh-turn-navigator` 用类似 minimap 的胶囊条解决这个问题：

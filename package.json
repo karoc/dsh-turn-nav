@@ -17,6 +17,7 @@
     "lib/index.js",
     "lib/client.js",
     "cordis.patch.yml",
+    "docs/turn-nav-rail.png",
     "README.md",
     "README.zh.md",
     "CHANGELOG.md",

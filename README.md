@@ -2,6 +2,8 @@
 
 An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **piano-key turn rail** to the conversation interface — a vertical column of tiny capsules on the right edge of the conversation, one per turn, so you can see every turn at a glance, hover to preview it, and click to jump to its start.
 
+![Turn navigation rail](docs/turn-nav-rail.png)
+
 ## Why
 
 In the default DSH web UI, finding a specific turn in a long conversation means scrolling — a lot. There's no overview of how many turns happened, what each turn was about, or where the current scroll position sits. `dsh-turn-navigator` solves this with a minimap-style rail:

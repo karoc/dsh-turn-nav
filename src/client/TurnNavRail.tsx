@@ -47,11 +47,17 @@ const HIGHLIGHT_CLASS = 'tn-jump-highlight'
 const JUMP_TIMEOUT_MS = 5000
 /** Delay between auto-load button clicks — lets the conversation render the
  *  prepended page (a heavy full-flow re-render) before the next one. */
-const LOAD_RENDER_SETTLE_MS = 700
-/** Cap on pages auto-loaded per session open. Loading the entire history of a
- *  very long conversation at once would stall the UI; the rail fills up
- *  first (visual cap) and the rest is loaded on-demand. */
-const MAX_AUTO_PAGES = 30
+const LOAD_RENDER_SETTLE_MS = 900
+/** Cap on pages auto-loaded per session open. Every page prepend re-renders
+ *  the whole conversation flow, so on a long conversation (hundreds of turns,
+ *  thousands of DOM rows) loading too much up-front stalls the UI. We pull a
+ *  few pages so the rail has more than the initial window, then stop — the
+ *  rest loads on-demand via scroll/click. */
+const MAX_AUTO_PAGES = 5
+/** Pages the rail-top scroll may load in ONE continuous pass before requiring
+ *  the user to scroll away and back — prevents holding the rail at its top
+ *  from pulling the entire history into the DOM at once. */
+const MAX_CONTINUOUS_SCROLL_PAGES = 3
 /** Cap on pages loaded while hunting a specific turn's row (click-to-jump). */
 const MAX_JUMP_PAGES = 40
 /** Extra vertical margin when scrolling a target row into view. */
@@ -243,8 +249,16 @@ export function TurnNavRail({ useSession, t }: RailProps) {
   useEffect(() => {
     const rail = railRef.current
     if (rail === null) return
+    // Pages loaded in the current continuous "held at the top" pass. Scrolling
+    // away resets it, so a user must deliberately scroll back to the top to
+    // pull more — a long conversation can never be fully loaded by holding.
+    let passPages = 0
     const onScroll = (): void => {
-      if (rail.scrollTop > 60) return // not near the top — stop
+      if (rail.scrollTop > 60) {
+        passPages = 0 // scrolled away — next pass starts fresh
+        return
+      }
+      if (passPages >= MAX_CONTINUOUS_SCROLL_PAGES) return // pass quota used
       const btn = findLoadOlderButton()
       if (btn === null) return // no more history — stop
       if (loadBusyRef.current || btn.disabled) {
@@ -254,10 +268,11 @@ export function TurnNavRail({ useSession, t }: RailProps) {
         return
       }
       loadBusyRef.current = true
+      passPages += 1
       btn.click()
       setTimeout(() => {
         loadBusyRef.current = false
-        if (rail.scrollTop <= 60) setTimeout(onScroll, 150)
+        if (rail.scrollTop <= 60 && passPages < MAX_CONTINUOUS_SCROLL_PAGES) setTimeout(onScroll, 150)
       }, LOAD_RENDER_SETTLE_MS)
     }
     rail.addEventListener('scroll', onScroll, { passive: true })
