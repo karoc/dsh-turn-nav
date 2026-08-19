@@ -12,7 +12,7 @@
 - Click-to-jump: scrolls the conversation flow to the turn's first node and briefly highlights it — computed via the scrollport's `scrollTop` and the `data-chat-anchor-key` DOM anchor.
 - **Stall-free auto-load**: the rail slowly fills its visible height after open (slow cadence, back-pressure, page cap), then keeps loading earlier turns while scrolled near its top — scroll-driven, like the conversation itself. A shared busy-lock prevents concurrent paging clicks.
 - **Custom tooltip bubble** (DSH visual style, multi-line) anchored to the **left** of the rail — rendered via a React portal to `document.body` so it stays viewport-fixed (a transform on the wrapper would otherwise misplace it), vertically centered on the hovered capsule, and clamped so the whole bubble stays inside the viewport even when the summary is long.
-- **Fixed-length rail**: 60vh regardless of turn count; scrolls internally with a hidden scrollbar.
+- **Auto-sizing rail**: its length grows with the turn count, capped at **30vh**; scrolls internally (hidden scrollbar) once the cap is hit.
 - **Up/down scroll buttons**: click to scroll ~1 viewport-height, and **hover-hold auto-scrolls** continuously; each is greyed out (disabled) when there is nothing to scroll in that direction.
 - **Center-on-activate**: clicking a capsule scrolls it to the center of the rail, unless it is the first or last turn (which sit at the edges).
 - Wave widening is **right-origin** (`transform-origin: right`), so capsules grow LEFTWARD only — the right edge never moves.

@@ -49,10 +49,9 @@ export const TURN_NAV_STYLES = `
   opacity: 0.45;
   cursor: default;
 }
-/* Rail: FIXED-height vertical column (regardless of turn count) with a hard
-   cap and internal scroll — the rail keeps one constant length and the turns
-   are viewed by scrolling. The scrollbar is HIDDEN
-   (scrollbar-width:none + webkit) so its appear/disappear never shifts
+/* Rail: AUTO-SIZING vertical column — its length grows with the turn count,
+   capped at 30vh; once the cap is hit it scrolls internally. The scrollbar is
+   HIDDEN (scrollbar-width:none + webkit) so its appear/disappear never shifts
    layout; scrolling is via wheel over the rail, the up/down buttons (click or
    hover-hold), or the rail-top auto-load. Buttons are packed flush (no gap)
    so hovering slides continuously without dead zones. */
@@ -60,8 +59,9 @@ export const TURN_NAV_STYLES = `
   display: flex;
   flex-direction: column;
   width: 26px;
-  height: 60vh;
-  max-height: 60vh;
+  height: auto;
+  max-height: 30vh;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: none;
