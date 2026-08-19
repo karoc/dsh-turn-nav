@@ -26,10 +26,10 @@ dsh web
 ## Usage
 
 1. Open any conversation with at least one completed turn.
-2. A vertical rail of grey capsules appears on the right edge of the conversation (one capsule per turn; the rail doubles as a proportional minimap of the whole history).
-3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH tooltip (the capsule glows white and grows — a wave ripple across the rail).
+2. A vertical rail of grey capsules appears on the right edge of the conversation (one capsule per turn). The rail is height-capped (60vh) and scrolls internally, so a very long conversation never pushes it past the viewport.
+3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH tooltip (the capsule glows white and widens 150% — the two neighbours widen a little too, a wave ripple across the rail).
 4. Click a capsule to jump to that turn's start; the target row briefly highlights.
-5. Older turns load automatically — no manual "Load earlier" clicks needed.
+5. Older history loads automatically — the rail fills its visible height first, and scrolling the rail to its top keeps loading earlier turns. No manual "Load earlier" clicks needed.
 
 ## How it works
 
@@ -43,7 +43,7 @@ Because the rail is session-scoped, it reads the live `ConversationSnapshot` str
 
 - **Turn extraction**: `chat.timeline.turnOrder` + `turns` map for boundaries; `chat.locations.getTurn(turn)` for each turn's node keys; the first `kind === 'user'` node's first text block for the summary; `turnTimings` for the timestamp. Turns without a user message fall back to their first node's kind.
 - **Jump-to-turn**: locate the turn's first chat-node key, find the DOM row via `data-chat-anchor-key="<key>"`, compute its position in the `[data-conversation-scroll]` scrollport, and set `scrollTop` precisely (more predictable than `scrollIntoView`). If the target row is not yet rendered (older page not loaded), it auto-clicks the "Load earlier" button and retries until the row appears — no "scroll once first" friction.
-- **Auto-load**: while the conversation's `hasMore` paging button ("加载更早 / Load earlier") is present, the rail keeps clicking it (respecting its disabled/in-flight state) until all history is loaded.
+- **Auto-load (stall-free)**: the conversation paginates its history — each page prepend re-renders the whole flow, so loading everything at once would stall the UI. The rail instead (a) slowly fills its visible height after open (slow cadence, back-pressure, page cap), then (b) keeps loading earlier turns while the rail is scrolled near its top — scroll-driven, the same way the conversation itself loads. Clicking a capsule also loads on demand to reach its turn. A shared busy-lock prevents the auto-load and scroll-load paths from ever clicking the paging button concurrently.
 
 ## Compatibility
 

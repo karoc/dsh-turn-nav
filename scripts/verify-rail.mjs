@@ -1,4 +1,5 @@
-// Final comprehensive rail verification: auto-load stability, wave hover, tooltip content, jump.
+// Final rail verification: geometry cap + scroll, wave widen + white, auto-load fill,
+// rail-top scroll continuation, click-to-jump.
 import { chromium } from 'playwright'
 
 const BASE = 'http://127.0.0.1:3080'
@@ -17,59 +18,104 @@ async function main() {
     const target = rows.find((r) => (r.textContent || '').includes('插件-看板'))
     if (target) target.click()
   })
-  await page.waitForTimeout(6000)
+  await page.waitForTimeout(7000)
 
-  // 1. Auto-load: wait until stable (load button gone and cap count stable for 2 checks).
-  let caps = 0
-  let stable = false
-  for (let i = 0; i < 60; i++) {
+  // 1. Initial auto-load fills the rail then pauses (not a full stall).
+  // Wait for BOTH caps and load-button state to stabilize (auto-load done).
+  let prevCaps = -1, prevLoads = -1, stable = 0, initial = 0
+  for (let i = 0; i < 40; i++) {
     const s = await page.evaluate(() => {
       const scroll = document.querySelector('[data-conversation-scroll]')
-      const loads = scroll ? Array.from(scroll.querySelectorAll('button')).filter((b) => /加载更早|Load earlier/.test(b.textContent || '')).length : 0
+      const loads = scroll ? Array.from(scroll.querySelectorAll('button')).filter((b) => /加载|Load/i.test(b.textContent || '')).length : -1
       return { caps: document.querySelectorAll('.tn-cap-btn').length, loads }
     })
-    if (s.loads === 0 && s.caps === caps) { stable = true; break }
-    caps = s.caps
+    if (s.caps === prevCaps && s.loads === prevLoads) {
+      stable++
+      if (stable >= 3) { initial = s.caps; break }
+    } else { stable = 0; prevCaps = s.caps; prevLoads = s.loads }
     await page.waitForTimeout(1000)
   }
-  console.log('auto-load:', JSON.stringify({ caps, stable }))
-
-  // 2. Wave hover on a middle capsule + tooltip content
-  const mid = Math.max(0, Math.floor(caps / 2))
-  await page.hover(`.tn-cap-btn:nth-child(${mid + 1})`)
-  await page.waitForTimeout(500)
-  const hover = await page.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll('.tn-cap-btn'))
-    const hot = btns.findIndex((b) => b.classList.contains('tn-cap-hot'))
-    const warm = btns.filter((b) => b.classList.contains('tn-cap-warm')).length
-    const tip = document.querySelector('[role="tooltip"]')
-    return { hot, warm, tooltip: tip ? tip.textContent : null }
-  })
-  console.log('wave hover:', JSON.stringify(hover))
-
-  // 3. Click that capsule → jump. Verify scrollTop moved near the target.
-  const before = await page.evaluate(() => {
-    const scroll = document.querySelector('[data-conversation-scroll]')
-    return scroll ? scroll.scrollTop : null
-  })
-  await page.evaluate((idx) => {
-    const btns = Array.from(document.querySelectorAll('.tn-cap-btn'))
-    if (btns[idx]) btns[idx].click()
-  }, mid)
-  await page.waitForTimeout(1500)
-  const after = await page.evaluate(() => {
-    const scroll = document.querySelector('[data-conversation-scroll]')
+  const geo = await page.evaluate(() => {
+    const r = document.querySelector('.tn-rail')
+    if (!r) return null
+    const cs = getComputedStyle(r)
     return {
-      scrollTop: scroll ? scroll.scrollTop : null,
-      highlight: document.querySelectorAll('.tn-jump-highlight').length,
+      caps: r.querySelectorAll('.tn-cap-btn').length,
+      height: Math.round(r.getBoundingClientRect().height),
+      maxHeight: cs.maxHeight,
+      overflowY: cs.overflowY,
+      scrollHeight: r.scrollHeight,
+      clientHeight: r.clientHeight,
     }
   })
-  console.log('jump:', JSON.stringify({ before, after }))
+  console.log('1. initial fill:', JSON.stringify({ initial, geo }))
 
-  // 4. Highlight fades
-  await page.waitForTimeout(1800)
-  const hlAfter = await page.evaluate(() => document.querySelectorAll('.tn-jump-highlight').length)
-  console.log('highlight after fade:', hlAfter)
+  // 2. Wave widen + white on hover.
+  await page.hover('.tn-cap-btn')
+  await page.waitForTimeout(400)
+  const wave = await page.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll('.tn-cap-btn'))
+    const hot = btns.find((b) => b.classList.contains('tn-cap-hot'))?.querySelector('.tn-cap')
+    const warm = btns.find((b) => b.classList.contains('tn-cap-warm'))?.querySelector('.tn-cap')
+    const plain = btns.find((b) => !b.classList.contains('tn-cap-hot') && !b.classList.contains('tn-cap-warm'))?.querySelector('.tn-cap')
+    const w = (el) => (el ? Math.round(parseFloat(getComputedStyle(el).width)) : null)
+    const bg = (el) => (el ? getComputedStyle(el).backgroundColor : null)
+    return { hotW: w(hot), hotBg: bg(hot), warmW: w(warm), plainW: w(plain) }
+  })
+  console.log('2. wave widen+white:', JSON.stringify(wave))
+
+  // 3. Rail-top scroll → load remaining history to the end.
+  // First confirm there IS more history (load button present), then scroll.
+  const pre = await page.evaluate(() => {
+    const scroll = document.querySelector('[data-conversation-scroll]')
+    const loads = scroll ? Array.from(scroll.querySelectorAll('button')).filter((b) => /加载|Load/i.test(b.textContent || '')).length : -1
+    return { caps: document.querySelectorAll('.tn-cap-btn').length, loads }
+  })
+  console.log('3. pre-scroll:', JSON.stringify(pre))
+  if (pre.loads > 0) {
+    await page.evaluate(() => {
+      const r = document.querySelector('.tn-rail')
+      if (r) { r.scrollTop = 0; for (let i = 0; i < 3; i++) r.dispatchEvent(new Event('scroll')) }
+    })
+    const samples = []
+    let grewTo = pre.caps
+    for (let i = 0; i < 20; i++) {
+      const caps = await page.evaluate(() => document.querySelectorAll('.tn-cap-btn').length)
+      samples.push(caps)
+      if (caps > grewTo) grewTo = caps
+      const loads = await page.evaluate(() => {
+        const scroll = document.querySelector('[data-conversation-scroll]')
+        return scroll ? Array.from(scroll.querySelectorAll('button')).filter((b) => /加载|Load/i.test(b.textContent || '')).length : -1
+      })
+      if (loads === 0 && caps === grewTo) break
+      await page.waitForTimeout(1000)
+    }
+    const btnEnd = await page.evaluate(() => {
+      const scroll = document.querySelector('[data-conversation-scroll]')
+      return scroll ? Array.from(scroll.querySelectorAll('button')).filter((b) => /加载|Load/i.test(b.textContent || '')).length : -1
+    })
+    console.log('3. scroll samples:', samples.join(','))
+    console.log('3. result:', JSON.stringify({ grewTo, loadButtonsAtEnd: btnEnd }))
+  } else {
+    console.log('3. already fully loaded; skipped scroll test')
+  }
+
+  // 4. Click a capsule → jump (scrollTop changes, highlight flashes).
+  const before = await page.evaluate(() => {
+    const s = document.querySelector('[data-conversation-scroll]')
+    return s ? s.scrollTop : null
+  })
+  await page.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll('.tn-cap-btn'))
+    const mid = Math.floor(btns.length / 2)
+    if (btns[mid]) btns[mid].click()
+  })
+  await page.waitForTimeout(800)
+  const jump = await page.evaluate(() => {
+    const s = document.querySelector('[data-conversation-scroll]')
+    return { scrollTop: s ? s.scrollTop : null, highlight: document.querySelectorAll('.tn-jump-highlight').length }
+  })
+  console.log('4. jump:', JSON.stringify({ before, jump }))
 
   console.log('errors:', errors.slice(0, 5))
   await browser.close()

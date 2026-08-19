@@ -17,7 +17,7 @@
  * row is not yet rendered.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, type ConversationSnapshotLike, type TurnEntry } from './turns.ts'
 import type { TurnNavKey } from './locales.ts'
@@ -44,15 +44,29 @@ const HIGHLIGHT_CLASS = 'tn-jump-highlight'
 
 /** Loaded-but-not-found retry window for click-to-jump (ms). */
 const JUMP_TIMEOUT_MS = 5000
-/** Delay between auto-load button clicks (lets loadingOlder settle). */
-const AUTO_LOAD_INTERVAL_MS = 350
+/** Delay between auto-load button clicks — lets the conversation render the
+ *  prepended page (a heavy full-flow re-render) before the next one. */
+const LOAD_RENDER_SETTLE_MS = 700
+/** Cap on pages auto-loaded per session open. Loading the entire history of a
+ *  very long conversation at once would stall the UI; the rail fills up
+ *  first (visual cap) and the rest is loaded on-demand. */
+const MAX_AUTO_PAGES = 30
+/** Cap on pages loaded while hunting a specific turn's row (click-to-jump). */
+const MAX_JUMP_PAGES = 40
 /** Extra vertical margin when scrolling a target row into view. */
 const JUMP_MARGIN_PX = 16
 
-/** Localized "Load earlier" button labels (the top paging button). */
+/** Localized "Load earlier" paging button labels — idle AND in-flight (the
+ *  conversation swaps the label to a "loading…" copy while a page is being
+ *  fetched; we must still recognize the button so loading state is tracked). */
+const LOAD_OLDER_TEXTS = new Set([
+  '加载更早', 'Load earlier', 'Load earlier…',
+  '加载中', '加载中…', 'Loading', 'Loading…',
+])
+
 function isLoadOlderButton(el: HTMLElement): boolean {
   const text = (el.textContent ?? '').trim()
-  return text === '加载更早' || text === 'Load earlier' || text === 'Load earlier…'
+  return LOAD_OLDER_TEXTS.has(text)
 }
 
 /** Find the scrollport (the conversation's scroll container). */
@@ -77,49 +91,30 @@ function findLoadOlderButton(): HTMLButtonElement | null {
 }
 
 /**
- * Auto-load all older history: repeatedly click the "Load earlier" button
- * (if present) until it disappears (hasMore === false). Each click pulls one
- * page and prepends it; the button is disabled while a page is in flight, so
- * we re-check on an interval rather than click-spamming.
- */
-function autoLoadOlder(stop: () => boolean): () => void {
-  let timer: ReturnType<typeof setTimeout> | null = null
-  let stopped = false
-  const tick = (): void => {
-    if (stopped || stop()) return
-    const btn = findLoadOlderButton()
-    if (btn === null) return // all history loaded
-    if (!btn.disabled) btn.click()
-    timer = setTimeout(tick, AUTO_LOAD_INTERVAL_MS)
-  }
-  timer = setTimeout(tick, 200)
-  return () => {
-    stopped = true
-    if (timer !== null) clearTimeout(timer)
-  }
-}
-
-/**
  * Wait for a chat row with the given node key to appear in the DOM, driving
  * the "load earlier" button meanwhile (the target turn may live in a not-yet
- * loaded page). Resolves with the row, or null on timeout.
+ * loaded page). Resolves with the row, or null on timeout / page cap.
  */
 function waitForRow(scrollport: HTMLElement, key: string, timeoutMs: number): Promise<HTMLElement | null> {
   return new Promise((resolve) => {
     const deadline = Date.now() + timeoutMs
+    let pages = 0
     const check = (): void => {
       const row = scrollport.querySelector<HTMLElement>(`[${ANCHOR_ATTR}="${CSS.escape(key)}"]`)
       if (row !== null) {
         resolve(row)
         return
       }
-      if (Date.now() > deadline) {
+      if (Date.now() > deadline || pages >= MAX_JUMP_PAGES) {
         resolve(null)
         return
       }
       const btn = findLoadOlderButton()
-      if (btn !== null && !btn.disabled) btn.click()
-      setTimeout(check, 120)
+      if (btn !== null && !btn.disabled) {
+        btn.click()
+        pages += 1
+      }
+      setTimeout(check, 150)
     }
     check()
   })
@@ -177,19 +172,94 @@ export function TurnNavRail({ useSession, t }: RailProps) {
   const snapshot = useSession?.((s: ConversationSnapshotLike) => s)
   const turns = useMemo(() => extractTurns(snapshot), [snapshot])
   const [hoverIndex, setHoverIndex] = useState(-1)
+  const autoPagesRef = useRef(0)
+  const loadBusyRef = useRef(false)
+  const railRef = useRef<HTMLDivElement | null>(null)
 
-  // Auto-load older history while this session's conversation is mounted:
-  // keep clicking the "Load earlier" button until every turn is in the window.
+  // Load one page of older history with a busy lock + render settle. Shared by
+  // the initial auto-load loop and the rail-top scroll trigger, so the two
+  // never click the paging button concurrently. `then(loaded)` reports whether
+  // a page was actually fetched (button found and clicked), so callers count
+  // real pages only.
+  const loadMoreOnce = useCallback((then: (loaded: boolean) => void): void => {
+    if (loadBusyRef.current) {
+      then(false)
+      return
+    }
+    const btn = findLoadOlderButton()
+    if (btn === null || btn.disabled) {
+      then(false)
+      return
+    }
+    loadBusyRef.current = true
+    btn.click()
+    // Let the prepended page render (a heavy full-flow re-render) before the
+    // lock releases, so back-to-back pages never pile up on the main thread.
+    setTimeout(() => {
+      loadBusyRef.current = false
+      then(true)
+    }, LOAD_RENDER_SETTLE_MS)
+  }, [])
+
+  // Initial auto-load: fill the rail's visible height with a few pages at a
+  // slow cadence, then stop (page cap or rail-full) — the rest is loaded on
+  // demand by scrolling the rail to its top. Prevents a very long
+  // conversation from stalling the UI by prepending every page back-to-back.
+  const hasTurns = turns.length > 0
   useEffect(() => {
-    if (turns.length === 0) return
-    // Re-arm whenever the turn list grows (new pages) or the snapshot changes.
-    return autoLoadOlder(() => false)
-  }, [turns.length])
+    if (!hasTurns) return
+    autoPagesRef.current = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let stopped = false
+    const tick = (): void => {
+      if (stopped || autoPagesRef.current >= MAX_AUTO_PAGES) return
+      const rail = railRef.current
+      // Stop once the rail is visually full (content taller than its box).
+      if (rail !== null && rail.scrollHeight > rail.clientHeight + 2) return
+      loadMoreOnce((loaded) => {
+        if (loaded) autoPagesRef.current += 1
+        if (!stopped) timer = setTimeout(tick, 300)
+      })
+    }
+    timer = setTimeout(tick, 300)
+    return () => {
+      stopped = true
+      if (timer !== null) clearTimeout(timer)
+    }
+  }, [hasTurns, loadMoreOnce])
+
+  // Rail-top scroll: keep loading older history (unbounded, user-driven) while
+  // the rail is scrolled near its top — the way the conversation itself loads
+  // on scroll. Scrolling away or reaching the end stops it. While near the
+  // top, keep retrying (queued) until a page actually loads or history ends.
+  useEffect(() => {
+    const rail = railRef.current
+    if (rail === null) return
+    const onScroll = (): void => {
+      if (rail.scrollTop > 60) return // not near the top — stop
+      const btn = findLoadOlderButton()
+      if (btn === null) return // no more history — stop
+      if (loadBusyRef.current || btn.disabled) {
+        // Busy (auto-load or another scroll pass in flight) or the page is
+        // still loading: retry shortly rather than drop this scroll.
+        setTimeout(onScroll, 150)
+        return
+      }
+      loadBusyRef.current = true
+      btn.click()
+      setTimeout(() => {
+        loadBusyRef.current = false
+        if (rail.scrollTop <= 60) setTimeout(onScroll, 150)
+      }, LOAD_RENDER_SETTLE_MS)
+    }
+    rail.addEventListener('scroll', onScroll, { passive: true })
+    return () => rail.removeEventListener('scroll', onScroll)
+  }, [hasTurns])
 
   if (turns.length === 0) return null
 
   return (
-    <div className="tn-rail" role="navigation" aria-label={t('rail')}>
+    <div ref={railRef} className="tn-rail" role="navigation" aria-label={t('rail')}>
       {turns.map((entry, i) => {
         const dist = hoverIndex === -1 ? Infinity : Math.abs(i - hoverIndex)
         const cls = dist === 0 ? ' tn-cap-hot' : dist === 1 ? ' tn-cap-warm' : ''

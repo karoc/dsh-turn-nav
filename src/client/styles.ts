@@ -4,15 +4,15 @@
  * semantic tokens, namespaced under `tn-` to avoid collisions. Tokens carry
  * no fallback because the host theme always defines them on the app root.
  *
- * Wave hover: hovering a capsule makes it glow white and grow; its two
- * neighbours rise slightly too, so sliding across the rail ripples like a
- * wave (hot = hovered, warm = adjacent).
+ * Wave hover: hovering a capsule makes it glow white and WIDEN (150%);
+ * its two neighbours widen a little too (125%), so sliding across the rail
+ * ripples like a wave (hot = hovered, warm = adjacent). Height stays ~3px.
  */
 export const TURN_NAV_STYLES = `
-/* Rail: fixed vertical column on the right edge, centered vertically,
-   capped in height so a long conversation does not overflow the viewport.
-   The capsules divide the available height evenly (flex: 1), so the rail
-   doubles as a proportional minimap of the whole conversation. */
+/* Rail: fixed vertical column on the right edge, centered vertically, with a
+   hard height cap and internal scroll — a long conversation must never push
+   the rail past the viewport. Each turn is a fixed-size hotspot; once the
+   rail is full it scrolls. */
 .tn-rail {
   position: fixed;
   right: 6px;
@@ -21,18 +21,20 @@ export const TURN_NAV_STYLES = `
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-height: 70vh;
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
   z-index: 30;
   pointer-events: none; /* the column is only a layout box; buttons opt in */
 }
 /* Per-turn hotspot: a wider/taller transparent button so the tiny capsule
-   still has a comfortable hover/click target. flex: 1 divides the rail
-   height across turns. */
+   still has a comfortable hover/click target. Fixed size — excess turns make
+   the rail scroll, they never compress it. */
 .tn-cap-btn {
   pointer-events: auto;
-  flex: 1;
-  min-height: 8px;
-  width: 24px;
+  flex: none;
+  min-height: 10px;
+  width: 26px;
   padding: 0;
   border: none;
   background: transparent;
@@ -48,22 +50,21 @@ export const TURN_NAV_STYLES = `
   height: 3px;
   border-radius: 2px;
   background: var(--dsw-alias-border-l3);
-  transition: height 150ms ease, width 150ms ease, background 150ms ease, border-radius 150ms ease;
+  transition: width 160ms ease, background 160ms ease, border-radius 160ms ease, box-shadow 160ms ease;
   flex: none;
 }
-/* Hovered capsule: glow white and grow (the wave peak). */
+/* Hovered capsule: glow WHITE and widen to 150% (the wave peak). Fixed white,
+   theme-independent (label tokens flip dark in light themes). */
 .tn-cap-btn.tn-cap-hot .tn-cap {
-  height: 16px;
   width: 18px;
   border-radius: 3px;
-  background: var(--dsw-alias-label-primary);
-  box-shadow: 0 0 6px var(--dsw-alias-label-primary);
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
 }
-/* Adjacent capsule: slightly raised (the wave's near neighbours). */
+/* Adjacent capsule: slightly wider (125%) — the wave's near neighbours. */
 .tn-cap-btn.tn-cap-warm .tn-cap {
-  height: 8px;
   width: 15px;
-  background: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-border-l2);
 }
 
 /* Jump highlight flash on the target row in the conversation flow. */
