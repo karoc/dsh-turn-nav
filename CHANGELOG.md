@@ -8,6 +8,7 @@
 - **Immediate jump feedback**: clicking an out-of-window capsule now shows instant feedback — the clicked capsule pulses and a "Locating turn N…" bubble appears beside it (in the DSH tooltip visual style) for the whole duration of the on-demand window extension; on failure a brief "Could not locate turn N" notice shows instead. No more silent waits.
 - **Oldest-turn jumps load to the true start**: jumping to the oldest turn now extends the window until there is no more history to load (hasMore false) — previously the window could include the target's boundary while earlier events were still pending, so the jump landed before the true first turn with a "Load earlier" button remaining. Readiness is judged by the target row being actually rendered in the DOM, not just the turn being listed in the window.
 - **Bilingual README switch**: README (English default) and README.zh.md now link to each other.
+- **Layer stacking**: the rail's z-index is now 10 — above the conversation flow content (max 8) but below full-screen overlays like the kanban board plugin (z-index 50) — matching the header's "Session log" button tier, so an open full-screen page always paints over the rail.
 - **README screenshot**: added `docs/turn-nav-rail.png` to the bilingual README (English default) as marketing, shipped in the npm package.
 
 ## [0.1.0] - 2026-08-19

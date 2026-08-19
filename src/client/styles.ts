@@ -11,7 +11,11 @@
 export const TURN_NAV_STYLES = `
 /* Wrapper: fixed column on the right edge (scroll buttons + rail + tooltip).
    The whole wrapper is pointer-events:auto so the wheel scrolls the rail
-   anywhere on it; buttons sit above and below the rail. */
+   anywhere on it; buttons sit above and below the rail.
+   z-index is deliberately LOW (10): above the conversation flow content
+   (max 8) but below full-screen overlays like the kanban board plugin
+   (z-index 50) — same order of magnitude as the header's "Session log"
+   button, so an open full-screen page always paints over the rail. */
 .tn-wrap {
   position: fixed;
   right: 6px;
@@ -20,7 +24,7 @@ export const TURN_NAV_STYLES = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 30;
+  z-index: 10;
   pointer-events: auto;
 }
 /* Up/down scroll controls at the top and bottom of the rail. Disabled (grey,
