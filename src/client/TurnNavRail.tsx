@@ -23,7 +23,14 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, turnOfNodeKey, type ChatSnapshotLike, type ConversationSnapshotLike } from './turns.ts'
-import { fetchAllTurns, type HistoryApi, type HistoryTurn } from './history.ts'
+import {
+  fetchAllTurns,
+  fetchJournalTurns,
+  type HistoryApi,
+  type HistoryTurn,
+  type JournalHandle,
+  type SessionAccessHandle,
+} from './history.ts'
 import type { TurnNavKey } from './locales.ts'
 
 /** Display entry for the rail (covers both history-derived and window-derived turns). */
@@ -51,8 +58,12 @@ interface SessionStandardProps {
 /** Injected face from the registration. */
 export interface RailInjected {
   t: (key: TurnNavKey, params?: Record<string, unknown>) => string
-  /** The browser→host sessions API, used to read history as data. */
+  /** The browser→host sessions API (pre-0.1.2), used to read history as data. */
   api?: HistoryApi
+  /** The 0.1.2+ Typert Remote `session/page` channel (full-history journal). */
+  journal?: JournalHandle
+  /** The official session store face (window seqs, hasMore, loadOlder). */
+  sessionAccess?: SessionAccessHandle
 }
 
 /** Full props of the rail component. */
@@ -69,6 +80,8 @@ const HIGHLIGHT_CLASS = 'tn-jump-highlight'
 const LOAD_RENDER_SETTLE_MS = 900
 /** Cap on pages loaded while expanding the window to a clicked turn. */
 const MAX_JUMP_PAGES = 100
+/** Bounded wait for the official session binding/window to appear on mount. */
+const JOURNAL_BINDING_WAIT_MS = 15000
 /** Extra vertical margin when scrolling a target row into view. */
 const JUMP_MARGIN_PX = 16
 
@@ -132,7 +145,7 @@ function formatTime(ms: number | undefined): string {
  * and renders a floating vertical capsule per turn (full history read from
  * the host as data; the flow window is extended only on click-to-jump).
  */
-export function TurnNavRail({ useSession, useChat, sessionId, t, api }: RailProps) {
+export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, sessionAccess }: RailProps) {
   // New (0.1.2+): conversation data comes from `useChat` (ChatSnapshot).
   // Legacy fallback: on older dsh `useSession` returned the old `.chat`-wrapped
   // snapshot — typed loosely here, narrowed by unwrapChat at read time.
@@ -182,22 +195,42 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api }: RailProp
     }
   }, [])
 
-  // Read the full persisted history from the host as DATA (no prepends into
+  // Read the full persisted history from the HOST as DATA (no prepends into
   // the flow — this is what keeps long sessions responsive). Incremental
-  // callback fills the rail page by page.
+  // callback fills the rail page by page. Channel priority:
+  //   1. 0.1.2+ journal (`ctx.remote.session.page` — reads only the region
+  //      below the loaded window, never touching the conversation flow);
+  //   2. legacy `sessions.history` RPC (pre-0.1.2 hosts);
+  //   3. none — window-only turns (navigation projection).
   useEffect(() => {
-    // History-as-data is an enhancement: on dsh builds where the browser→host
-    // history RPC is unavailable (`connection.api` absent), we fall back to the
-    // loaded-window turns (navigation projection) and skip full-history reads.
-    if (api === undefined || sessionId === undefined) return
+    if (sessionId === undefined) return
     let cancelled = false
-    void fetchAllTurns(api, sessionId, (pageTurns) => {
-      if (!cancelled) setHistoryTurns(pageTurns)
-    }).then((finalTurns) => {
-      if (!cancelled) setHistoryTurns(finalTurns)
-    })
+    const applyPage = (turns: HistoryTurn[]): void => { if (!cancelled) setHistoryTurns(turns) }
+    const run = async (): Promise<void> => {
+      // The official session binding (and its event window) is staged a moment
+      // after the conversation view mounts; wait for it (bounded) so the
+      // journal can read the window's seq bounds instead of silently skipping.
+      let window = sessionAccess?.windowSeq(sessionId) ?? { firstSeq: undefined, lastSeq: undefined }
+      if (sessionAccess !== undefined) {
+        const deadline = Date.now() + JOURNAL_BINDING_WAIT_MS
+        while (window.lastSeq === undefined && Date.now() < deadline) {
+          await sleep(300)
+          if (cancelled) return
+          window = sessionAccess.windowSeq(sessionId)
+        }
+      }
+      const journalTurns = await fetchJournalTurns(journal, sessionId, window, applyPage)
+      if (cancelled) return
+      if (journalTurns !== undefined) { setHistoryTurns(journalTurns); return }
+      if (api !== undefined) {
+        await fetchAllTurns(api, sessionId, applyPage).then((finalTurns) => {
+          if (!cancelled) setHistoryTurns(finalTurns)
+        })
+      }
+    }
+    void run()
     return () => { cancelled = true }
-  }, [api, sessionId])
+  }, [api, journal, sessionAccess, sessionId])
 
   // Display list: full history, plus any window-only (latest, still-running)
   // turns not yet persisted, ordered by turn number.
@@ -333,14 +366,37 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api }: RailProp
     // lands before the true first turn with a "Load earlier" button remaining.
     const isOldest = turns[0]?.turn === turn
 
-    // Expand the window (on demand) until the target turn's first row is
-    // actually rendered in the DOM — and, for the oldest turn, until there is
-    // no more history to load — then scroll + highlight.
+    // Scroll the target row into view and flash it.
     const scrollToRow = (row: HTMLElement): void => {
       const targetTop = row.getBoundingClientRect().top - scrollport.getBoundingClientRect().top + scrollport.scrollTop
       scrollport.scrollTop = Math.max(0, targetTop - JUMP_MARGIN_PX)
       row.classList.add(HIGHLIGHT_CLASS)
       setTimeout(() => row.classList.remove(HIGHLIGHT_CLASS), 1500)
+    }
+
+    // Wait (bounded) for the target turn's first row to materialize in the DOM
+    // after a page load — polls the live chat snapshot for the turn's node key
+    // instead of a fixed sleep, so fast renders jump immediately.
+    const waitForRow = async (timeoutMs: number): Promise<HTMLElement | null> => {
+      const deadline = Date.now() + timeoutMs
+      while (Date.now() < deadline) {
+        const snap = chatRef.current
+        const key = snap === undefined ? undefined : firstNodeKeyOfTurn(snap, turn)
+        if (key !== undefined) {
+          const row = scrollport.querySelector<HTMLElement>(`[${ANCHOR_ATTR}="${CSS.escape(key)}"]`)
+          if (row !== null) return row
+        }
+        await sleep(80)
+      }
+      return null
+    }
+
+    // "Is the target renderable now, and are we done for the oldest turn?"
+    const settled = (row: HTMLElement | null): boolean => {
+      if (row === null) return false
+      if (!isOldest) return true
+      const more = sessionAccess !== undefined ? sessionAccess.hasMore(sessionId ?? '') : findLoadOlderButton() !== null
+      return !more
     }
 
     for (let i = 0; i < MAX_JUMP_PAGES; i += 1) {
@@ -350,22 +406,39 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api }: RailProp
         ? null
         : scrollport.querySelector<HTMLElement>(`[${ANCHOR_ATTR}="${CSS.escape(key)}"]`)
 
-      if (row !== null) {
-        const more = findLoadOlderButton()
-        if (!isOldest || more === null) {
-          // Target rendered and (for the oldest turn) history fully loaded.
-          scrollToRow(row)
-          return true
-        }
+      if (settled(row)) {
+        scrollToRow(row as HTMLElement)
+        return true
       }
 
-      const btn = findLoadOlderButton()
-      if (btn === null) {
-        // No more history: the target must be renderable now.
-        if (row !== null) {
-          scrollToRow(row)
+      // Preferred path (0.1.2+): pull one page through the official session
+      // store. The store pages by the window's own first seq and publishes the
+      // enlarged window synchronously; we then poll for the target row.
+      if (sessionAccess !== undefined) {
+        if (!sessionAccess.hasMore(sessionId ?? '')) {
+          // No more history and the target is still absent: unreachable.
+          if (row !== null) { scrollToRow(row); return true }
+          return false
+        }
+        try {
+          await sessionAccess.loadOlder(sessionId ?? '')
+        } catch {
+          return row !== null ? (scrollToRow(row), true) : false
+        }
+        const awaited = await waitForRow(LOAD_RENDER_SETTLE_MS)
+        if (awaited !== null && settled(awaited)) {
+          scrollToRow(awaited)
           return true
         }
+        // Row not (yet) rendered or oldest-turn still pending: keep paging.
+        continue
+      }
+
+      // Fallback (older hosts / no session store): click the flow's own
+      // "Load earlier" button.
+      const btn = findLoadOlderButton()
+      if (btn === null) {
+        if (row !== null) { scrollToRow(row); return true }
         return false
       }
       if (btn.disabled) { await sleep(150); continue }

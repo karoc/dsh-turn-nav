@@ -5,7 +5,7 @@ async function main() {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30000 })
+  await page.goto(process.env.DSH_TOKEN ? `${BASE}/?token=${process.env.DSH_TOKEN}` : BASE, { waitUntil: 'domcontentloaded', timeout: 30000 })
   await page.waitForTimeout(6000)
   await page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll('[class*="sessionRow"]'))

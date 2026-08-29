@@ -53,9 +53,65 @@ export interface HistoryTurn {
   status: string
 }
 
+// ---------------------------------------------------------------------------
+// 0.1.2+ journal channel: the Typert Remote `session/page` endpoint. On dsh
+// 0.1.2+ the old browser→host `sessions.history` RPC was removed along with
+// `connection.api`; its equivalent lives in the mounted `ctx.remote.session`
+// namespace (assembled by `@deepseek-ai/dsh-api-remotes/client`). Reading the
+// journal pages the SAME persisted log the official window uses, as plain
+// data — zero prepends into the conversation flow.
+// ---------------------------------------------------------------------------
+
+/** Wire event (structural subset of `SessionWireEvent`). */
+export interface JournalWireEvent {
+  type: string
+  seq: number
+  time: number
+  data: { turn?: number; content?: readonly { type: string; text?: string }[]; [key: string]: unknown }
+}
+
+/** One journal record: a raw event or a packed assistant chunk run. */
+export type JournalRecord =
+  | { type: 'event'; event: JournalWireEvent }
+  | { type: 'chunks'; event: { type: string; seq: number; time: number; data: unknown } }
+
+/** `session/page` request (structural `SessionPageRequest`). */
+export interface JournalPageRequest {
+  address: { kind: 'session'; sessionId: string }
+  throughSeq: number
+  beforeSeq?: number
+  maxMessages?: number
+}
+
+/** `session/page` response (structural `RemoteResult<SessionPage>`). */
+export interface JournalPageResult {
+  ok: boolean
+  value?: { records: JournalRecord[]; hasMore: boolean }
+  error?: { code: string; message: string }
+}
+
+/** The mounted `ctx.remote.session` namespace face (structural subset). */
+export interface JournalHandle {
+  page(request: JournalPageRequest, signal?: AbortSignal): Promise<JournalPageResult>
+}
+
+/** The official session store face (structural subset of `ctx.sessions`). */
+export interface SessionAccessHandle {
+  /** Oldest/newest event seq of the loaded window, when one exists. */
+  windowSeq(sessionId: string): { firstSeq: number | undefined; lastSeq: number | undefined }
+  /** Whether older history remains outside the loaded window (authoritative). */
+  hasMore(sessionId: string): boolean
+  /** Pull one older page into the official window; resolves false on failure/unavailable. */
+  loadOlder(sessionId: string): Promise<boolean>
+}
+
 const SUMMARY_MAX_CHARS = 80
 /** Safety cap on history pages read (50 events each). */
 const MAX_HISTORY_PAGES = 500
+/** Journal page size in MESSAGES (user/assistant count) — no host cap, fewer round trips. */
+const JOURNAL_PAGE_MESSAGES = 200
+/** Safety cap on journal pages read. */
+const MAX_JOURNAL_PAGES = 100
 
 function firstText(content: readonly { type: string; text?: string }[] | undefined): string {
   if (content === undefined) return ''
@@ -110,6 +166,69 @@ export async function fetchAllTurns(
     beforeSeq = events[0].event.seq
   }
   allEvents.sort((a, b) => a.seq - b.seq)
+  const turns = buildTurns(allEvents)
+  onPage(turns)
+  return turns
+}
+
+/**
+ * Read the FULL persisted history through the 0.1.2+ journal channel
+ * (`ctx.remote.session.page`), newest page first, walking back via `beforeSeq`
+ * until `hasMore` is false. Only events BELOW the loaded window are fetched
+ * (the window itself already covers the tail), so the conversation flow is
+ * never touched — this is what keeps very long sessions responsive.
+ *
+ * Returns `undefined` when the journal channel is unavailable (older dsh), so
+ * the caller can fall back to the legacy `sessions.history` RPC or to
+ * window-only turns.
+ *
+ * @param journal - the mounted journal namespace face, or undefined.
+ * @param sessionId - the session to read.
+ * @param window - oldest/newest event seq of the currently loaded window.
+ * @param onPage - incremental callback (turns derived so far, ascending).
+ * @param signal - optional caller cancellation.
+ */
+export async function fetchJournalTurns(
+  journal: JournalHandle | undefined,
+  sessionId: string,
+  window: { firstSeq: number | undefined; lastSeq: number | undefined },
+  onPage: (turns: HistoryTurn[]) => void,
+  signal?: AbortSignal,
+): Promise<HistoryTurn[] | undefined> {
+  if (journal === undefined || typeof journal.page !== 'function') return undefined
+  // No window, or the window already starts at the log's first event: nothing
+  // older exists to read (the window covers it).
+  if (window.lastSeq === undefined || window.firstSeq === 0) return []
+  const before0 = window.firstSeq !== undefined && window.firstSeq > 0 ? window.firstSeq - 1 : undefined
+  if (before0 === undefined) return []
+
+  const allEvents: HistoryEventLike[] = []
+  let beforeSeq = before0
+  for (let page = 0; page < MAX_JOURNAL_PAGES; page += 1) {
+    if (signal?.aborted) break
+    const result = await journal.page({
+      address: { kind: 'session', sessionId },
+      throughSeq: window.lastSeq,
+      beforeSeq,
+      maxMessages: JOURNAL_PAGE_MESSAGES,
+    }, signal)
+    if (!result.ok || result.value === undefined) {
+      // eslint-disable-next-line no-console
+      console.warn('[dsh-turn-nav] session/page failed', result.error?.code ?? 'no result')
+      break
+    }
+    const { records, hasMore } = result.value
+    if (records.length === 0) break
+    for (const record of records) {
+      if (record.type === 'event') allEvents.push(record.event)
+    }
+    onPage(buildTurns(allEvents))
+    if (!hasMore) break
+    let minSeq = Infinity
+    for (const record of records) minSeq = Math.min(minSeq, record.event.seq)
+    if (!Number.isFinite(minSeq)) break
+    beforeSeq = minSeq
+  }
   const turns = buildTurns(allEvents)
   onPage(turns)
   return turns

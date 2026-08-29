@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0] - 2026-08-29
+
+### Added
+
+- **Full history restored on dsh 0.1.2+ (journal channel)**: the 0.2.0 refactor removed the browser→host `sessions.history` RPC, so the rail degraded to loaded-window turns. This release restores the full-history rail in the browser with **zero host changes and zero new dependencies**: the plugin pages the same persisted log the official window reads through the Typert Remote `session/page` endpoint (`ctx.remote.session` — the namespace is mounted by the base web assembly into `ctx.get('remote.session')`, read without adding to the cordis `inject` list because `ctx.get` is the inject-free store read; the traced `ctx.get('remote').session` path would hit the "without inject" gate). Every persisted turn (including turns far outside the window) is shown as plain data, paged incrementally, with no prepends into the conversation flow on open — the same performance story as 0.1.x, now purely client-side.
+- **Official-store jump path**: window expansion for out-of-window jumps now goes through the official session store (`sessions.binding(id).session.loadOlder()`), with the authoritative `hasMore` from `binding(id).eventSource.getSnapshot().hasMore` as the loop terminator (no more DOM "Load earlier" button sniffing on 0.1.2+), and row polling instead of fixed sleeps so fast renders jump immediately. The "Load earlier" button path remains as a fallback on older hosts.
+- **Journal readiness wait**: the official session binding is staged a moment after the conversation view mounts; the full-history fetch now waits (bounded, 15s) for the window's seq bounds instead of silently skipping, so the rail fills with all turns shortly after open.
+
+### Changed
+
+- History-channel priority: 0.1.2+ journal (`session/page`) → legacy `sessions.history` RPC → window-only turns (each layer degrades gracefully, including when `remote.session` is not yet mounted at boot — handles are resolved lazily and retried at render).
+
 ## [0.2.0] - 2026-08-29
 
 ### Changed

@@ -45,9 +45,9 @@ dsh web
 
 因为胶囊条是 session 作用域，它直接从框架 `useSession` kit 读取实时 `ConversationSnapshot`，并以 `position: fixed` 渲染（不占据 header 的 flex 行）。
 
-- **轮次提取**：胶囊条的完整轮次列表来自 browser→host 的 `sessions.history` RPC（分页、增量）——每一轮持久化轮次都以数据派生（`turn/start` / `user/message` / `turn/end` 事件 → 轮次号、时间戳、首条用户消息摘要），包括远在会话窗口之外的轮次。实时窗口快照（`useSession` → `chat.timeline.turnOrder`）补充最新的运行中轮次。无用户消息的轮次降级显示其首个节点的 kind。
-- **跳转定位**：取该轮第一个 chat-node key，通过 `data-chat-anchor-key="<key>"` 找到 DOM 行，在 `[data-conversation-scroll]` 滚动容器中精确计算并设置 `scrollTop`（比 `scrollIntoView` 更可控）。若目标行尚未渲染（更早页面未加载），自动点击"加载更早"按钮并重试直到行出现——无需先滚动一下。
-- **历史即数据（打开零 prepend）**：会话窗口只把一页事件物化为 DOM，扩展窗口（`loadOlder`）会重渲染整个会话流——长会话代价高。胶囊条改为通过 browser→host 的 `sessions.history` RPC 分页读取完整持久化历史，把每轮派生为纯数据，**打开会话完全不触碰会话流 DOM**。**按需加载**：点击窗口内轮次直接滚动；点击窗口外轮次时，胶囊条逐页扩展窗口（点击"加载更早"分页按钮，尊重其加载中状态）直到目标轮进入窗口，再滚动并高亮——这是唯一会 prepend 会话流的路径，且只在用户点击时发生。
+- **轮次提取**：胶囊条的完整轮次列表以"历史即数据"方式派生（`turn/start` / `user/message` / `turn/end` 事件 → 轮次号、时间戳、首条用户消息摘要），包括远在会话窗口之外的轮次。实时窗口快照（`useChat` → `navigation.items()` + `timeline`）补充最新的运行中轮次。无用户消息的轮次降级显示其首个节点的 kind。
+- **跳转定位**：取该轮第一个 chat-node key，通过 `data-chat-anchor-key="<key>"` 找到 DOM 行，在 `[data-conversation-scroll]` 滚动容器中精确计算并设置 `scrollTop`（比 `scrollIntoView` 更可控）。若目标行尚未渲染（更早页面未加载），通过官方会话 store 的 `loadOlder()` 逐页扩展窗口（以其权威 `hasMore` 为准），直到目标轮进入窗口再滚动并高亮——无需先滚动一下。
+- **历史即数据（打开零 prepend）**：会话窗口只把一页事件物化为 DOM，扩展窗口（`loadOlder`）会重渲染整个会话流——长会话代价高。胶囊条改为把完整持久化历史读成纯数据，把每轮派生出来，**打开会话完全不触碰会话流 DOM**。dsh 0.1.2+ 走 Typert Remote 的 `session/page` 通道（与官方窗口同一条持久化日志，经 `ctx.remote.session` 分页——该命名空间由基础 web 装配挂载，**零宿主改动、零新增依赖**）；旧版 dsh 走 `sessions.history` RPC。**按需加载**：点击窗口内轮次直接滚动；点击窗口外轮次时，胶囊条逐页扩展窗口（官方 store 的 `loadOlder()`，旧版宿主回退到点击"加载更早"按钮）直到目标轮进入窗口，再滚动并高亮——这是唯一会 prepend 会话流的路径，且只在用户点击时发生。
 
 ## 兼容性
 
