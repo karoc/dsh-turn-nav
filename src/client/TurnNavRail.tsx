@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { extractTurns, firstNodeKeyOfTurn, type ConversationSnapshotLike } from './turns.ts'
+import { extractTurns, firstNodeKeyOfTurn, turnOfNodeKey, type ChatSnapshotLike, type ConversationSnapshotLike } from './turns.ts'
 import { fetchAllTurns, type HistoryApi, type HistoryTurn } from './history.ts'
 import type { TurnNavKey } from './locales.ts'
 
@@ -36,9 +36,15 @@ export interface RailTurn {
   status: string
 }
 
-/** Structural session-standard props (session scope, framework-injected). */
+/** Structural session-standard props (session scope, framework-injected).
+ *  0.1.2+ split the conversation data out of `useSession` into `useChat`:
+ *  `useSession` now yields SessionSnapshot (lifecycle fields), `useChat`
+ *  yields ChatSnapshot (the turn data we read). We type `useSession` loosely
+ *  (it is only used as a legacy fallback on older dsh where it carried the
+ *  old `.chat`-wrapped snapshot) and read turn data from `useChat`. */
 interface SessionStandardProps {
-  useSession?: <T,>(selector: (snapshot: ConversationSnapshotLike) => T) => T
+  useSession?: <T,>(selector: (snapshot: unknown) => T) => T
+  useChat?: <T,>(selector: (chat: ChatSnapshotLike) => T) => T
   sessionId?: string
 }
 
@@ -126,14 +132,18 @@ function formatTime(ms: number | undefined): string {
  * and renders a floating vertical capsule per turn (full history read from
  * the host as data; the flow window is extended only on click-to-jump).
  */
-export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
-  const snapshot = useSession?.((s: ConversationSnapshotLike) => s)
-  // Latest snapshot for async handlers (click-to-jump reads it after loads).
-  const snapshotRef = useRef<ConversationSnapshotLike | undefined>(snapshot)
-  snapshotRef.current = snapshot
+export function TurnNavRail({ useSession, useChat, sessionId, t, api }: RailProps) {
+  // New (0.1.2+): conversation data comes from `useChat` (ChatSnapshot).
+  // Legacy fallback: on older dsh `useSession` returned the old `.chat`-wrapped
+  // snapshot — typed loosely here, narrowed by unwrapChat at read time.
+  const legacySession = useSession?.((s: unknown) => s) as ConversationSnapshotLike | undefined
+  const chat = useChat?.((c: ChatSnapshotLike) => c)
+  // Latest chat for async handlers (click-to-jump reads it after loads).
+  const chatRef = useRef<ChatSnapshotLike | ConversationSnapshotLike | undefined>(chat ?? legacySession)
+  chatRef.current = chat ?? legacySession
 
   // Turns currently in the conversation window (transitional + latest turns).
-  const windowTurns = useMemo(() => extractTurns(snapshot), [snapshot])
+  const windowTurns = useMemo(() => extractTurns(chat ?? legacySession), [chat, legacySession])
   // Full turn list read from the host history (incremental).
   const [historyTurns, setHistoryTurns] = useState<HistoryTurn[]>([])
   const [hoverIndex, setHoverIndex] = useState(-1)
@@ -144,14 +154,41 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
   // On-demand jump feedback: which turn is being located (or failed), and the
   // vertical position to anchor the feedback bubble next to.
   const [jumpState, setJumpState] = useState<{ turn: number; y: number; phase: 'loading' | 'error' } | null>(null)
+  // Whether the built-in (official) TurnNavigator rail is present — when it is,
+  // we nudge our rail to the header zone to avoid overlapping it.
+  const [officialRail, setOfficialRail] = useState(false)
   const railRef = useRef<HTMLDivElement | null>(null)
   const tipRef = useRef<HTMLDivElement | null>(null)
   const hoverScrollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Detect the official in-chat TurnNavigator rail so we can avoid overlapping
+  // it. Re-checks on an interval + a MutationObserver on the transcript.
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null
+    const check = (): void => {
+      const official = document.querySelector('nav[aria-label*="轮次"], nav[aria-label*="Turn navigation"]') !== null
+      setOfficialRail((prev) => prev === official ? prev : official)
+    }
+    check()
+    timer = setInterval(check, 1500)
+    const scroll = document.querySelector('[data-conversation-scroll]')
+    const observer = scroll !== null && typeof MutationObserver !== 'undefined'
+      ? new MutationObserver(check)
+      : null
+    if (observer !== null && scroll !== null) observer.observe(scroll, { childList: true, subtree: true })
+    return () => {
+      if (timer !== null) clearInterval(timer)
+      observer?.disconnect()
+    }
+  }, [])
 
   // Read the full persisted history from the host as DATA (no prepends into
   // the flow — this is what keeps long sessions responsive). Incremental
   // callback fills the rail page by page.
   useEffect(() => {
+    // History-as-data is an enhancement: on dsh builds where the browser→host
+    // history RPC is unavailable (`connection.api` absent), we fall back to the
+    // loaded-window turns (navigation projection) and skip full-history reads.
     if (api === undefined || sessionId === undefined) return
     let cancelled = false
     void fetchAllTurns(api, sessionId, (pageTurns) => {
@@ -170,6 +207,45 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
     const extras = windowTurns.filter((entry) => !historySet.has(entry.turn))
     return [...historyTurns, ...extras].sort((a, b) => a.turn - b.turn)
   }, [historyTurns, windowTurns])
+
+  // Follow-scroll active turn: the turn owning the reading line (top of the
+  // visible transcript + a small inset), re-evaluated on scroll via rAF.
+  const [activeTurn, setActiveTurn] = useState<number | null>(null)
+  useEffect(() => {
+    const scroll = document.querySelector('[data-conversation-scroll]')
+    if (scroll === null) return
+    let frame: number | null = null
+    const compute = (): void => {
+      frame = null
+      const scrollport = document.querySelector('[data-conversation-scroll]')
+      if (scrollport === null) return
+      const rect = scrollport.getBoundingClientRect()
+      const readingLine = rect.top + Math.min(96, rect.height * 0.2)
+      const rows = Array.from(scrollport.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
+      let row: HTMLElement | null = null
+      for (const r of rows) {
+        const rr = r.getBoundingClientRect()
+        if (rr.bottom > readingLine && rr.top < rect.bottom) { row = r; break }
+      }
+      const key = row?.getAttribute('data-chat-anchor-key') ?? null
+      if (key !== null) {
+        setActiveTurn(turnOfNodeKey(chatRef.current, key) ?? null)
+      } else if (rows.length > 0) {
+        setActiveTurn(null)
+      }
+    }
+    const schedule = (): void => {
+      if (frame !== null) return
+      frame = requestAnimationFrame(compute)
+    }
+    scroll.addEventListener('scroll', schedule, { passive: true })
+    // also when turns change (new content)
+    schedule()
+    return () => {
+      scroll.removeEventListener('scroll', schedule)
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [turns.length])
 
   // Track whether there is more content above/below the rail's viewport, to
   // enable/disable the scroll buttons.
@@ -268,7 +344,7 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
     }
 
     for (let i = 0; i < MAX_JUMP_PAGES; i += 1) {
-      const snap = snapshotRef.current
+      const snap = chatRef.current
       const key = snap === undefined ? undefined : firstNodeKeyOfTurn(snap, turn)
       const row = key === undefined
         ? null
@@ -318,7 +394,12 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
   if (turns.length === 0) return null
 
   return (
-    <div className="tn-wrap" role="navigation" aria-label={t('rail')} onMouseLeave={() => { setHoverIndex(-1); stopHoverScroll() }}>
+    <div
+      className={`tn-wrap${officialRail ? ' tn-nudge' : ''}`}
+      role="navigation"
+      aria-label={t('rail')}
+      onMouseLeave={() => { setHoverIndex(-1); stopHoverScroll() }}
+    >
       {/* Scroll-up control at the top of the rail. */}
       <button
         type="button"
@@ -336,11 +417,12 @@ export function TurnNavRail({ useSession, sessionId, t, api }: RailProps) {
           const dist = hoverIndex === -1 ? Infinity : Math.abs(i - hoverIndex)
           const cls = dist === 0 ? ' tn-cap-hot' : dist === 1 ? ' tn-cap-warm' : ''
           const loading = jumpState !== null && jumpState.phase === 'loading' && jumpState.turn === entry.turn
+          const isActive = activeTurn === entry.turn
           return (
             <button
               key={entry.turn}
               type="button"
-              className={`tn-cap-btn${cls}${loading ? ' tn-loading' : ''}`}
+              className={`tn-cap-btn${cls}${loading ? ' tn-loading' : ''}${isActive ? ' tn-cap-active' : ''}`}
               onMouseEnter={(e) => {
                 setHoverIndex(i)
                 const rect = e.currentTarget.getBoundingClientRect()

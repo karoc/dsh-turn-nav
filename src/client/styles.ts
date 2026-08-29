@@ -27,6 +27,22 @@ export const TURN_NAV_STYLES = `
   z-index: 10;
   pointer-events: auto;
 }
+/* When the built-in (official) TurnNavigator rail is present in the transcript
+   (right edge, vertically centered on the scrollport band), nudge our rail up
+   into the header zone so the two never overlap: same right edge, but pinned
+   below the session header instead of the scrollport center. */
+.tn-wrap.tn-nudge {
+  top: 64px;
+  transform: none;
+  max-height: calc(100vh - 140px);
+}
+/* Narrow viewport: mirror the official rail's @container (max-width: 900px)
+   hide, so we never fight the compact layout for the right edge. */
+@media (max-width: 900px) {
+  .tn-wrap {
+    display: none;
+  }
+}
 /* Up/down scroll controls at the top and bottom of the rail. Disabled (grey,
    no pointer/hover-scroll) when there is nothing to scroll in that
    direction. */
@@ -116,6 +132,12 @@ export const TURN_NAV_STYLES = `
 .tn-cap-btn.tn-cap-warm .tn-cap {
   transform: scaleX(1.25);
   background: var(--dsw-alias-label-secondary);
+}
+/* Active (current) turn following the scroll: a persistent brand tint so the
+   reader always knows where they are in the rail, distinct from hover. */
+.tn-cap-btn.tn-cap-active .tn-cap {
+  background: var(--dsw-alias-state-business-primary);
+  width: 14px;
 }
 /* Custom tooltip bubble: mirrors the DSH tooltip visual (dark plate, white
    text, pre-line for multi-line info), fixed-positioned to the LEFT of the

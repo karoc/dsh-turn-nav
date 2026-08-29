@@ -28,8 +28,10 @@ interface ChatViewNode {
   readonly data: unknown
 }
 
-/** ChatSnapshot structural contract (subset we read). */
-interface ChatSnapshotLike {
+/** ChatSnapshot structural contract (subset we read) — the value the new
+ *  `useChat` session hook returns (0.1.2+ refactor: conversation data moved
+ *  from `snapshot.chat` into the dedicated ChatSnapshot). */
+export interface ChatSnapshotLike {
   readonly order: readonly string[]
   readonly nodes: { get(key: string): ChatViewNode | undefined }
   readonly locations: { getTurn(turn: number): readonly string[] }
@@ -42,12 +44,24 @@ interface ChatSnapshotLike {
       readonly status: string
     }>
   }
+  /** New (0.1.2+) navigation projection: the loaded Turns the rail addresses. */
+  readonly navigation?: {
+    items(): readonly {
+      readonly turn: number
+      readonly anchorKey: string
+      readonly prompt: string
+      readonly response: string
+    }[]
+  }
+  readonly legacy?: {
+    readonly turnTimings?: ReadonlyMap<number, { readonly startTime: number; readonly endTime?: number }>
+  }
 }
 
-/** ConversationSnapshot structural contract (subset we read). */
+/** Deprecated alias for the OLD pre-0.1.2 conversation snapshot (had `.chat`). */
 export interface ConversationSnapshotLike {
   readonly chat: ChatSnapshotLike
-  readonly turnTimings: ReadonlyMap<number, { readonly startTime: number; readonly endTime?: number }>
+  readonly turnTimings?: ReadonlyMap<number, { readonly startTime: number; readonly endTime?: number }>
 }
 
 /** One extracted turn for the navigation list. */
@@ -81,19 +95,45 @@ function firstText(content: readonly { type: string; text?: string }[] | undefin
 }
 
 /**
- * Derive the flat turn list from a conversation snapshot.
+ * Derive the flat turn list from a chat snapshot.
  *
  * For each turn in `timeline.turnOrder`, the function looks up the turn's
  * chat-node keys via `locations.getTurn`, finds the first node whose `kind`
  * is `'user'`, and extracts the text summary from its content blocks. The
- * timestamp comes from `turnTimings` (preferred) or `turn.start.time`.
+ * timestamp comes from `legacy.turnTimings` (preferred) or `turn.start.time`.
  *
- * @param snap - the conversation snapshot (structural subset).
+ * Accepts BOTH the new (0.1.2+) ChatSnapshot (from `useChat`) and the legacy
+ * `ConversationSnapshot` (which had a `.chat` field) — so an upgrade never
+ * crashes if the host is still on the older shape.
+ *
+ * @param snap - the chat snapshot (structural subset).
  * @returns ordered turn entries (empty when the snapshot has no turns).
  */
-export function extractTurns(snap: ConversationSnapshotLike | undefined): TurnEntry[] {
-  if (snap === undefined) return []
-  const chat = snap.chat
+export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike | undefined): TurnEntry[] {
+  const chat = unwrapChat(snap)
+  if (chat === undefined) return []
+  const turnTimings = chat.legacy?.turnTimings
+    ?? (snap !== undefined && 'turnTimings' in snap ? snap.turnTimings : undefined)
+
+  // 0.1.2+: the loaded-Turn navigation projection is the rail's source of
+  // truth (timeline only tracks the current/open turn). Legacy fallback:
+  // timeline.turnOrder enumerates every window turn.
+  const navItems = chat.navigation?.items?.() ?? []
+  if (navItems.length > 0) {
+    return navItems.map((item, index) => {
+      const loc = chat.timeline.turns.get(item.turn)
+      const status = loc?.status ?? 'closed'
+      return {
+        turn: item.turn,
+        index: index + 1,
+        summary: item.prompt || '(no user message)',
+        fullText: item.prompt || '',
+        startTime: turnTimings?.get(item.turn)?.startTime ?? loc?.start?.time,
+        status,
+      }
+    })
+  }
+
   const timeline = chat.timeline
   const turnOrder = timeline.turnOrder
   if (turnOrder.length === 0) return []
@@ -104,7 +144,7 @@ export function extractTurns(snap: ConversationSnapshotLike | undefined): TurnEn
     displayIndex += 1
     const loc = timeline.turns.get(turn)
     const status = loc?.status ?? 'unknown'
-    const startTime = snap.turnTimings.get(turn)?.startTime ?? loc?.start?.time
+    const startTime = turnTimings?.get(turn)?.startTime ?? loc?.start?.time
 
     // Find the first user-message node in this turn.
     let summary = ''
@@ -147,6 +187,13 @@ export function extractTurns(snap: ConversationSnapshotLike | undefined): TurnEn
   return entries
 }
 
+/** Narrow either the new ChatSnapshot or the legacy `.chat`-wrapped snapshot to a chat. */
+function unwrapChat(snap: ChatSnapshotLike | ConversationSnapshotLike | undefined): ChatSnapshotLike | undefined {
+  if (snap === undefined) return undefined
+  if ('chat' in snap && snap.chat !== undefined) return snap.chat
+  return snap as ChatSnapshotLike
+}
+
 /** Best-effort text peek from a non-user chat node's data (erased shape). */
 function peekNodeText(node: ChatViewNode): string {
   const data = node.data as Record<string, unknown> | undefined
@@ -182,11 +229,12 @@ function kindLabel(turn: number, keys: readonly string[], chat: ChatSnapshotLike
  * @returns the first node key in that turn (typically the user message), or undefined.
  */
 export function firstNodeKeyOfTurn(
-  snap: ConversationSnapshotLike | undefined,
+  snap: ChatSnapshotLike | ConversationSnapshotLike | undefined,
   turn: number,
 ): string | undefined {
-  if (snap === undefined) return undefined
-  const keys = snap.chat.locations.getTurn(turn)
+  const chat = unwrapChat(snap)
+  if (chat === undefined) return undefined
+  const keys = chat.locations.getTurn(turn)
   return keys[0]
 }
 
@@ -202,13 +250,14 @@ export function firstNodeKeyOfTurn(
  * @returns the owning turn number, or undefined if not found.
  */
 export function turnOfNodeKey(
-  snap: ConversationSnapshotLike | undefined,
+  snap: ChatSnapshotLike | ConversationSnapshotLike | undefined,
   key: string,
 ): number | undefined {
-  if (snap === undefined) return undefined
-  const { turnOrder, turns } = snap.chat.timeline
+  const chat = unwrapChat(snap)
+  if (chat === undefined) return undefined
+  const { turnOrder, turns } = chat.timeline
   for (const turn of turnOrder) {
-    const keys = snap.chat.locations.getTurn(turn)
+    const keys = chat.locations.getTurn(turn)
     if (keys.includes(key)) return turn
   }
   return undefined

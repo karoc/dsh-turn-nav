@@ -25,9 +25,11 @@ export interface HistoryEntryLike {
   event: HistoryEventLike
 }
 
-/** Structural browser→host sessions API (subset we use). */
+/** Structural browser→host sessions API (subset we use). `sessions.history`
+ *  may be absent on newer dsh where the RPC moved — treated as "no full
+ *  history" (window-only fallback). */
 export interface HistoryApi {
-  sessions: {
+  sessions?: {
     history(payload: {
       sessionId: string
       beforeSeq?: number
@@ -80,15 +82,24 @@ function truncate(text: string): string {
  * @param onPage - incremental callback (turns so far, in ascending turn order).
  */
 export async function fetchAllTurns(
-  api: HistoryApi,
+  api: HistoryApi | undefined,
   sessionId: string,
   onPage: (turns: HistoryTurn[]) => void,
 ): Promise<HistoryTurn[]> {
+  if (api === undefined || typeof api.sessions?.history !== 'function') {
+    // eslint-disable-next-line no-console
+    console.warn('[dsh-turn-nav] sessions.history RPC unavailable — falling back to window-only turns')
+    return []
+  }
   const allEvents: HistoryEventLike[] = []
   let beforeSeq: number | undefined
   for (let page = 0; page < MAX_HISTORY_PAGES; page += 1) {
     const response = await api.sessions.history({ sessionId, beforeSeq, maxMessages: 50 })
-    if (response.result === undefined || response.result.ok !== true) break
+    if (response.result === undefined || response.result.ok !== true) {
+      // eslint-disable-next-line no-console
+      console.warn('[dsh-turn-nav] sessions.history page failed', response.error?.code ?? 'no result')
+      break
+    }
     const value = response.result.value
     if (value === undefined) break
     const { events, hasMore } = value

@@ -53,6 +53,7 @@ dsh web
 
 - DeepSeek Harness (dsh) Web 客户端（`dsh web`）。
 - 需要 `conversation.session.header.utilities` slot 声明（当前 DSH 已包含）。
+- 与官方内置轮次 rail 共存（会话内、无法关闭）：官方 rail 存在时我们的胶囊条自动上移到 header 区域，两者不重叠；900px 以下都隐藏。
 - 与全屏插件页面（如看板）共存：胶囊条层级位于全屏 overlay 之下，打开全屏页面时会覆盖胶囊条。
 
 ## 许可证

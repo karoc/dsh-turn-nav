@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.0] - 2026-08-29
+
+### Changed
+
+- **Adapted to dsh 0.1.2+ (ui-chat refactor)**: the conversation data model changed — `ConversationSnapshot` lost its `chat` field and the old `dsh-client-runtime` package was removed. The rail now reads turn data through the new `useChat` hook (ChatSnapshot, `navigation.items()`), falls back to the legacy `.chat`-wrapped snapshot on older dsh, and imports `ClientContext` from `@deepseek-ai/cordis` (with the `dsh-client-ui-renderer/client` merge for `ctx.slots`). This fixes the crash that hid the rail after upgrading.
+- **Coexists with the official built-in TurnNavigator**: the official dsh rail (in-chat, always rendered, cannot be disabled) now overlaps-free — when it is present our rail nudges up into the header zone (`.tn-nudge`) instead of the scrollport center. Mirrored the official narrow-viewport hide (`@media max-width: 900px`).
+- **Added follow-scroll active-turn highlight**: the capsule for the turn at the reading line is tinted (brand color) as you scroll — a capability the official rail has and we previously lacked.
+- **History-as-data is window-scoped on 0.1.2+**: the browser→host `sessions.history` RPC (`connection.api`) was removed in the refactor, so the full-history read is unavailable in the browser on new dsh; the rail degrades to the loaded-window turns (same data as the official rail) and keeps its UI/UX (wave hover, scroll buttons, center-on-click, tooltip, jump feedback, follow highlight). Full-history support is a known follow-up (host-half route) if desired.
+
 ## [0.1.1] - 2026-08-19
 
 ### Changed
