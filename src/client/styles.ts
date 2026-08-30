@@ -43,6 +43,65 @@ export const TURN_NAV_STYLES = `
     display: none;
   }
 }
+/* Subtractive takeover (settings → Turn navigation = DSH STN): hide the
+   OFFICIAL built-in rail. The official rail lives inside the conversation
+   scroll container (data-conversation-scroll) — our rail is fixed outside
+   it — so a container-scoped rule cannot match ours. The tn-hide-official
+   body class is toggled by mode.ts; the official rail itself has no
+   off-switch, so this stylesheet override is the only way to replace it. */
+body.tn-hide-official [data-conversation-scroll] nav {
+  display: none !important;
+}
+/* Settings → General preference row (which rail to show). Mirrors the official
+   EnterBehaviorRow tokens. */
+.tn-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+.tn-mode-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 48px;
+}
+.tn-mode-title {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+.tn-mode-desc {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.tn-mode-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 18px;
+  background: var(--dsw-alias-bg-module-platform);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+.tn-mode-selector:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.tn-mode-chevron {
+  flex: none;
+}
 /* Up/down scroll controls at the top and bottom of the rail. Disabled (grey,
    no pointer/hover-scroll) when there is nothing to scroll in that
    direction. */

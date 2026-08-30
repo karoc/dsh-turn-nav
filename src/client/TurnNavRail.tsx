@@ -18,7 +18,7 @@
  * renders the flow, and jumping loads only what is needed to reach the target.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -31,6 +31,7 @@ import {
   type JournalHandle,
   type SessionAccessHandle,
 } from './history.ts'
+import { getRailMode, subscribeRailMode } from './mode.ts'
 import type { TurnNavKey } from './locales.ts'
 
 /** Display entry for the rail (covers both history-derived and window-derived turns). */
@@ -167,8 +168,13 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
   // On-demand jump feedback: which turn is being located (or failed), and the
   // vertical position to anchor the feedback bubble next to.
   const [jumpState, setJumpState] = useState<{ turn: number; y: number; phase: 'loading' | 'error' } | null>(null)
-  // Whether the built-in (official) TurnNavigator rail is present — when it is,
-  // we nudge our rail to the header zone to avoid overlapping it.
+  // Whether the built-in (official) TurnNavigator rail is VISIBLE in the
+  // transcript. When it is, we nudge our rail to the header zone to avoid
+  // overlapping it — unless the user chose the "DSH STN" mode, whose stylesheet
+  // override hides the official rail (the visibility check below then reports
+  // false and we stay centered). The check is scoped to the conversation
+  // scroll container because our own rail is fixed OUTSIDE it, and it uses the
+  // COMPUTED display value so the stylesheet override is respected.
   const [officialRail, setOfficialRail] = useState(false)
   const railRef = useRef<HTMLDivElement | null>(null)
   const tipRef = useRef<HTMLDivElement | null>(null)
@@ -179,8 +185,12 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null
     const check = (): void => {
-      const official = document.querySelector('nav[aria-label*="轮次"], nav[aria-label*="Turn navigation"]') !== null
-      setOfficialRail((prev) => prev === official ? prev : official)
+      const scroll = document.querySelector('[data-conversation-scroll]')
+      const nav = scroll === null
+        ? null
+        : scroll.querySelector<HTMLElement>('nav[aria-label*="轮次"], nav[aria-label*="Turn navigation"]')
+      const visible = nav !== null && getComputedStyle(nav).display !== 'none'
+      setOfficialRail((prev) => prev === visible ? prev : visible)
     }
     check()
     timer = setInterval(check, 1500)
@@ -231,6 +241,10 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
     void run()
     return () => { cancelled = true }
   }, [api, journal, sessionAccess, sessionId])
+
+  // Rail display mode (settings → Turn navigation): 'stn' shows us (and hides
+  // the official rail via the stylesheet override), 'official'/'hidden' hide us.
+  const railMode = useSyncExternalStore(subscribeRailMode, getRailMode)
 
   // Display list: full history, plus any window-only (latest, still-running)
   // turns not yet persisted, ordered by turn number.
@@ -464,7 +478,7 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
     })
   }
 
-  if (turns.length === 0) return null
+  if (turns.length === 0 || railMode !== 'stn') return null
 
   return (
     <div

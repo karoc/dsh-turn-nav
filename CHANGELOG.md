@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0] - 2026-08-29
+
+### Added
+
+- **Rail display mode (Settings → General → Turn navigation)**: three-way choice between `DSH official` (the built-in rail), `DSH STN` (this plugin's rail — default), and `Hide all`. Registered into the official `settings.general.item` seat (root scope), styled like the built-in preference rows (EnterBehaviorRow pattern), persisted browser-locally (localStorage — the official `settingsScope` store needs a Host-registered namespace that an external client-only plugin has no seam to create).
+- **Subtractive takeover of the official rail**: the official built-in TurnNavigator has no off-switch, so in `DSH STN` mode it is hidden with a container-scoped stylesheet override (`body.tn-hide-official [data-conversation-scroll] nav { display: none !important }` — our rail is fixed OUTSIDE the conversation scroll container, so the rule cannot match ours), and our rail takes over the right-edge center position. `Hide all` hides both.
+- **Official-rail detection fix**: the old check matched `nav[aria-label*="轮次"/"Turn navigation"]` anywhere, which also matched OUR OWN rail (same localized label) — so the rail stayed nudged into the header zone even when the official rail was absent (e.g. 1-turn sessions). The check is now scoped to `[data-conversation-scroll]` and reads the COMPUTED display value, so the nudge follows reality: official visible → we nudge; official hidden by our override → we stay centered.
+- **Brand name**: DSH Smoothly Turn Nav (DSH STN) — used in the README, settings row, and changelog.
+
+# Changelog
+
 ## [0.3.0] - 2026-08-29
 
 ### Added

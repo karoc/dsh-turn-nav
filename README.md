@@ -1,8 +1,8 @@
-# dsh-turn-navigator
+# DSH Smoothly Turn Nav (dsh-turn-navigator)
 
 **English · [简体中文](README.zh.md)**
 
-An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **piano-key turn rail** to the conversation interface — a vertical column of tiny capsules on the right edge of the conversation, one per turn, so you can see every turn at a glance, hover to preview it, and click to jump to its start.
+An external [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin — **DSH Smoothly Turn Nav (DSH STN)** — that adds a **piano-key turn rail** to the conversation interface: a vertical column of tiny capsules on the right edge of the conversation, one per turn, so you can see every turn at a glance, hover to preview it, and click to jump to its start. It can **replace the official built-in turn rail** (which cannot be disabled) — see Usage.
 
 ![Turn navigation rail](docs/turn-nav-rail.png)
 
@@ -13,7 +13,7 @@ In the default DSH web UI, finding a specific turn in a long conversation means 
 - A **vertical capsule per turn** floats on the right edge of the conversation (grey, ~3px tall, piano-key style).
 - **Hovering** a capsule makes it glow with the theme's primary label color and widen to 150% (the two neighbours widen to 125% too), so sliding across the rail ripples like a wave — and shows the full turn info (index, timestamp, user-message summary) in a native DSH tooltip.
 - **Clicking** a capsule scrolls the conversation to that turn's start and briefly highlights it.
-- **Every loaded turn, instantly**: the rail reads turns from the live chat snapshot (`useChat` → `navigation.items()`, the same data the official rail uses) — no prepends into the conversation flow. On dsh builds where the browser→host history RPC is available (pre-0.1.2), it also reads the full persisted history as data; on 0.1.2+ the history RPC was removed, so the rail shows the loaded window (same scope as the official rail) with our richer UI.
+- **Every turn, instantly — full history as data**: the rail reads the FULL persisted history through the Typert Remote `session/page` channel on dsh 0.1.2+ (the same log the official window reads, paged as plain data — zero prepends into the conversation flow on open), and through the `sessions.history` RPC on older dsh. Turns far outside the loaded window are visible immediately; jumping to one extends the window on demand only.
 
 ## Installation
 
@@ -29,6 +29,7 @@ dsh web
 
 ## Usage
 
+0. **Choose which rail to show** (Settings → General → **Turn navigation**): `DSH official` (the built-in rail), `DSH STN` (this plugin's rail — **default**), or `Hide all`. The official rail has no off-switch, so choosing DSH STN hides it with a stylesheet override and our rail takes over the right-edge center position. The choice persists across reloads.
 1. Open any conversation with at least one completed turn.
 2. A vertical rail of grey capsules appears on the right edge of the conversation (one capsule per turn). The rail **auto-sizes**: its length grows with the turn count, capped at **30vh** — a short conversation gets a short rail, a long one hits the cap and scrolls internally with a **hidden scrollbar** (no layout jitter). **Up/down scroll buttons** at its top and bottom support both click and **hover-hold auto-scroll**, and are greyed out when there is nothing to scroll in that direction — so the rail never stretches past the viewport, and you can wheel, click, or hold to move through the turns.
 3. Hover a capsule to see the turn's index, timestamp, and user-message summary in a DSH-style tooltip anchored to the left of the rail, vertically centered on the hovered capsule and always fully inside the viewport. The capsule glows with the theme color and widens 150% LEFTWARDS (right-aligned — the right edge never moves), with the two neighbours widening a little too, a wave ripple across the rail.
@@ -52,8 +53,8 @@ Because the rail is session-scoped, it reads the live `ConversationSnapshot` str
 ## Compatibility
 
 - DeepSeek Harness (dsh) with the web client (`dsh web`).
-- Requires the `conversation.session.header.utilities` slot declaration (present in current DSH).
-- Coexists with the official built-in TurnNavigator rail (in-chat, cannot be disabled): when it is present our rail nudges into the header zone so the two never overlap; both hide under 900px width. Coexists with full-screen plugin pages (e.g. the kanban board): the rail sits below their overlay layer.
+- Requires the `conversation.session.header.utilities` and `settings.general.item` slot declarations (present in current DSH).
+- **Replaces the official built-in TurnNavigator rail** (which has no off-switch) in the default `DSH STN` mode: the official rail is hidden via a container-scoped stylesheet override and our rail takes its right-edge center position. In `DSH official` mode our rail is hidden and the official one shows. Both hide under 900px width. Coexists with full-screen plugin pages (e.g. the kanban board): the rail sits below their overlay layer.
 
 ## License
 

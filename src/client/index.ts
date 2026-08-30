@@ -12,12 +12,16 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the shell's SlotMap merges (the 'conversation.session
 // .header.utilities' entry) into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+// Type-only: pulls the settings domain's SlotMap merges ('settings.general.item').
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { TurnNavRail, type RailInjected } from './TurnNavRail.tsx'
+import { SettingsNavModeRow, type ModeRowInjected } from './SettingsNavModeRow.tsx'
+import { applyModeToBody } from './mode.ts'
 import { en, zh, type TurnNavKey } from './locales.ts'
 import type {
   JournalHandle,
@@ -75,6 +79,9 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle | undefined
   const api = connection?.api
 
+  // Sync the official-rail hiding body class with the persisted rail mode.
+  applyModeToBody()
+
   // 0.1.2+ full-history channels (both provided by the base web assembly; both
   // absent on older hosts — the rail then degrades gracefully):
   //   journal        → ctx.remote.session.page  (Typert Remote history paging)
@@ -126,6 +133,16 @@ export function apply(ctx: ClientContext): void {
     }
   }
   resolveHandles()
+
+  // Settings → General preference row: WHICH turn rail to show (DSH official /
+  // DSH STN / hide all). Root scope, like the built-in preference rows.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'dsh-turn-navigator-mode',
+    order: 30,
+    locale: NS,
+    inject: (): ModeRowInjected => ({ t }),
+  }, SettingsNavModeRow))
 
   // Session-header utilities: the floating turn rail (session scope gives
   // useSession). It renders as position:fixed, so it does not occupy the
