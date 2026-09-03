@@ -123,10 +123,13 @@ function clampFeedbackY(y: number): number {
   return Math.max(24, Math.min(y, window.innerHeight - 24))
 }
 
-/** Tooltip body for one turn: index, time, full summary. */
+/** Tooltip body for one turn: turn number, time, full summary. */
 function tooltipText(entry: RailTurn, t: (key: TurnNavKey, params?: Record<string, unknown>) => string): string {
   const time = formatTime(entry.startTime)
-  const label = t('turnLabel', { n: String(entry.index) })
+  // The label is the TRUE turn number (`entry.turn`), not a list position:
+  // window-only extras carry a window-local index (restarting at 1), which
+  // made merged lists show e.g. "第 38 轮" followed by "第 2 轮".
+  const label = t('turnLabel', { n: String(entry.turn) })
   const body = entry.fullText || entry.summary || t('noSummary')
   const lines = [label]
   if (time !== '') lines.push(time)
@@ -179,6 +182,9 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
   const railRef = useRef<HTMLDivElement | null>(null)
   const tipRef = useRef<HTMLDivElement | null>(null)
   const hoverScrollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // True while the pointer is over the rail — the auto-follow scroll must
+  // never yank the rail away while the user is browsing it.
+  const pointerOverRailRef = useRef(false)
 
   // Detect the official in-chat TurnNavigator rail so we can avoid overlapping
   // it. Re-checks on an interval + a MutationObserver on the transcript.
@@ -247,12 +253,17 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
   const railMode = useSyncExternalStore(subscribeRailMode, getRailMode)
 
   // Display list: full history, plus any window-only (latest, still-running)
-  // turns not yet persisted, ordered by turn number.
+  // turns not yet persisted, ordered by turn number. The merged list
+  // re-derives `index` as the list position — sources assign it over their
+  // OWN subset (history pages start at 1, window extras restart at 1), so a
+  // raw merge leaves duplicate/wrong indices.
   const turns = useMemo<RailTurn[]>(() => {
     if (historyTurns.length === 0) return windowTurns
     const historySet = new Set(historyTurns.map((entry) => entry.turn))
     const extras = windowTurns.filter((entry) => !historySet.has(entry.turn))
-    return [...historyTurns, ...extras].sort((a, b) => a.turn - b.turn)
+    return [...historyTurns, ...extras]
+      .sort((a, b) => a.turn - b.turn)
+      .map((entry, i) => ({ ...entry, index: i + 1 }))
   }, [historyTurns, windowTurns])
 
   // Follow-scroll active turn: the turn owning the reading line (top of the
@@ -293,6 +304,28 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
       if (frame !== null) cancelAnimationFrame(frame)
     }
   }, [turns.length])
+
+  // Auto-follow for the RAIL's own viewport: keep the active turn's capsule
+  // visible. The rail is capped at 30vh with an internal scrollbar, so in a
+  // long session the active capsule routinely sits outside the rail's visible
+  // band (e.g. on open the capsule list starts at the top while the reading
+  // position is at the tail). Whenever the active capsule is not fully
+  // visible, scroll it into view (centered, matching click behavior) — unless
+  // the pointer is over the rail, in which case the user is browsing it and
+  // we never yank it away.
+  useEffect(() => {
+    if (activeTurn === null || pointerOverRailRef.current) return
+    const index = turns.findIndex((entry) => entry.turn === activeTurn)
+    if (index < 0) return
+    const rail = railRef.current
+    if (rail === null) return
+    const btn = rail.querySelectorAll<HTMLElement>('.tn-cap-btn')[index]
+    if (btn === undefined) return
+    const railRect = rail.getBoundingClientRect()
+    const btnRect = btn.getBoundingClientRect()
+    if (btnRect.top >= railRect.top && btnRect.bottom <= railRect.bottom) return
+    centerCapsule(index)
+  }, [activeTurn, turns])
 
   // Track whether there is more content above/below the rail's viewport, to
   // enable/disable the scroll buttons.
@@ -485,7 +518,8 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
       className={`tn-wrap${officialRail ? ' tn-nudge' : ''}`}
       role="navigation"
       aria-label={t('rail')}
-      onMouseLeave={() => { setHoverIndex(-1); stopHoverScroll() }}
+      onMouseEnter={() => { pointerOverRailRef.current = true }}
+      onMouseLeave={() => { pointerOverRailRef.current = false; setHoverIndex(-1); stopHoverScroll() }}
     >
       {/* Scroll-up control at the top of the rail. */}
       <button

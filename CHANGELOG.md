@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1] - 2026-09-03
+
+### Fixed
+
+- **Rail tooltip/aria now show the TRUE turn number** — the "第 N 轮" label previously used `entry.index` (the position within each source's own subset: every history page starts at 1, and window-only extras start at 1 too), so a merged long session could read "第 38 轮" followed by "第 2 轮". The label now comes from `entry.turn` (absolute, consistent with the "正在定位第 N 轮" bubble), and the merged list re-derives `index` purely as its sorted list position — `src/client/TurnNavRail.tsx`, `src/client/turns.ts`.
+- **Rail viewport follows the active turn** — the rail is capped at 30vh with an internal scrollbar, so in a long session the current turn's capsule sat outside the visible band on open/scroll. A new effect scrolls the active capsule into the rail's viewport (centered) whenever it leaves it, with a pointer-over guard so a user browsing the rail is never yanked — `src/client/TurnNavRail.tsx`.
+- **Compile/runtime hardening on dsh 0.1.2+** — the newer `ClientContext` type surface dropped `connection.api` (the 0.1.2+ journal channel replaced the RPC); the browser side now reads it structurally (`(connection as { api?: HistoryApi })?.api`) so both older and newer hosts compile and run — `src/client/index.ts`.
+
 ## [0.4.0] - 2026-08-29
 
 ### Added

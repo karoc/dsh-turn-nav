@@ -66,9 +66,9 @@ export interface ConversationSnapshotLike {
 
 /** One extracted turn for the navigation list. */
 export interface TurnEntry {
-  /** Turn number (1-based in the UI, but stored as-is from the timeline). */
+  /** True turn number (from the timeline / turn-start event) — the UI label. */
   turn: number
-  /** Display label: "#N" for the list. */
+  /** Position within THIS source's list (the merged rail list re-derives it). */
   index: number
   /** First ~80 chars of the first user message in this turn. */
   summary: string

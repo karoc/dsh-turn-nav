@@ -24,6 +24,7 @@ import { SettingsNavModeRow, type ModeRowInjected } from './SettingsNavModeRow.t
 import { applyModeToBody } from './mode.ts'
 import { en, zh, type TurnNavKey } from './locales.ts'
 import type {
+  HistoryApi,
   JournalHandle,
   JournalPageRequest,
   JournalPageResult,
@@ -77,7 +78,10 @@ export function apply(ctx: ClientContext): void {
 
   const t = ctx.locale.bind(NS) as (key: TurnNavKey, params?: Record<string, unknown>) => string
   const connection = ctx.get('connection') as ConnectionHandle | undefined
-  const api = connection?.api
+  // Classic hosts exposed the browser→host RPC as `connection.api`; newer
+  // type surfaces dropped the field (the 0.1.2+ journal channel replaced
+  // it), so read it structurally to keep both worlds compiling and running.
+  const api = (connection as { api?: HistoryApi } | undefined)?.api
 
   // Sync the official-rail hiding body class with the persisted rail mode.
   applyModeToBody()
