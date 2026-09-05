@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.2] - 2026-09-05
+
+### Docs
+
+- **README relaunch with dsh-versioned differentiation (bilingual)**. The official-rail comparison table now names its targets explicitly — **dsh 0.1.3-alpha.1** official `TurnNavigator` vs **DSH STN v0.4.2** — reflecting that as of 0.1.3 the built-in rail added full-session scope (host `turnOutline` projection) and out-of-window load-and-jump, and marking what still separates DSH STN (switchable/disableable rail, timestamped full-summary tooltip, scroll buttons + wave hover, external read-only plugin, zero host changes) plus what applies on dsh ≤ 0.1.2 (where the official rail is still loaded-window only). A new bilingual **Version map** section maps each DSH STN release to its dsh baseline (≤ 0.1.1 legacy RPC / 0.1.2+ journal channel / 0.1.3-alpha.1 structural review).
+
 ## [0.4.1] - 2026-09-03
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "name": "dsh-turn-navigator",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "DSH Smoothly Turn Nav (DSH STN): full-history piano-key turn rail for DeepSeek Harness (dsh) web conversations — see every turn at a glance, hover to preview, click to jump anywhere, and replace the official (non-disableable) turn rail.",
   "type": "module",
   "main": "lib/index.js",
