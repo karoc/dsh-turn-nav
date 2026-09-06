@@ -1,5 +1,5 @@
 // Capture the marketing screenshot for the README: fixture session (75 turns),
-// default DSH STN mode — our rail centered on the right edge, official hidden.
+// default Smoothly TN mode — our rail centered on the right edge, official hidden.
 import { chromium } from 'playwright'
 
 const browser = await chromium.launch({ headless: true })

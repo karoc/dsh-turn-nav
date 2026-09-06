@@ -139,7 +139,7 @@ export function apply(ctx: ClientContext): void {
   resolveHandles()
 
   // Settings → General preference row: WHICH turn rail to show (DSH official /
-  // DSH STN / hide all). Root scope, like the built-in preference rows.
+  // Smoothly TN / hide all). Root scope, like the built-in preference rows.
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
     id: 'dsh-turn-navigator-mode',

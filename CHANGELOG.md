@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.3] - 2026-09-06
+
+### Changed
+
+- **Brand naming standardized**: the product is now **Smoothly Turn Nav**（简称 **Smoothly TN**，品牌英文 **Smoothly** / 品牌中文 **思磨力**；中文名 **思磨力轮次胶囊条**），replacing the previous "DSH Smoothly Turn Nav (DSH STN)". Applied everywhere user-visible: bilingual README (title, features, comparison table, version map, usage, compatibility), `package.json` description + keywords, the Settings → General *Turn navigation* rail-mode labels (`Smoothly TN` / `思磨力轮次胶囊条`), code comments, and the verify-mode acceptance assertion. **Technical identifiers are intentionally unchanged and decoupled from the brand**: npm package name, plugin/slot IDs, locale namespace, CSS prefix, and the localStorage mode key all remain `dsh-turn-navigator` — installed profiles, persisted preferences, and the bundle URL are untouched. Historical documents (`docs/official-vs-ours.md`, past changelog entries) keep their original naming.
+
 ## [0.4.2] - 2026-09-05
 
 ### Docs

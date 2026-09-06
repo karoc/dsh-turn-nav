@@ -43,7 +43,7 @@ export const TURN_NAV_STYLES = `
     display: none;
   }
 }
-/* Subtractive takeover (settings → Turn navigation = DSH STN): hide the
+/* Subtractive takeover (settings → Turn navigation = Smoothly TN): hide the
    OFFICIAL built-in rail. The official rail lives inside the conversation
    scroll container (data-conversation-scroll) — our rail is fixed outside
    it — so a container-scoped rule cannot match ours. The tn-hide-official

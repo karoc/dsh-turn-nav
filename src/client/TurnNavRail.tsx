@@ -173,7 +173,7 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
   const [jumpState, setJumpState] = useState<{ turn: number; y: number; phase: 'loading' | 'error' } | null>(null)
   // Whether the built-in (official) TurnNavigator rail is VISIBLE in the
   // transcript. When it is, we nudge our rail to the header zone to avoid
-  // overlapping it — unless the user chose the "DSH STN" mode, whose stylesheet
+  // overlapping it — unless the user chose the "Smoothly TN" mode, whose stylesheet
   // override hides the official rail (the visibility check below then reports
   // false and we stay centered). The check is scoped to the conversation
   // scroll container because our own rail is fixed OUTSIDE it, and it uses the

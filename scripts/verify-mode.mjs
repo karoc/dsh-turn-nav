@@ -137,7 +137,7 @@ async function main() {
       }
     })
     console.log('settings row:', JSON.stringify(row))
-    pass &&= row !== null && row.selectorText.includes('STN')
+    pass &&= row !== null && (row.selectorText.includes('Smoothly TN') || row.selectorText.includes('思磨力轮次胶囊条'))
 
     // Switch to "DSH official" via the Menu and verify the rail reacts.
     if (row) {

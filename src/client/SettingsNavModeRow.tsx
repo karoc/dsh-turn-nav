@@ -5,7 +5,7 @@
  * the General section renders each contribution as one row, so this component
  * draws its own title, description, and a three-way selector:
  *
- *   DSH official | DSH STN (Smoothly Turn Nav) | Hide all
+ *   DSH official | Smoothly TN (Smoothly Turn Nav) | Hide all
  *
  * The choice is persisted browser-locally (see mode.ts) and drives both the
  * rail component (React-side visibility) and the official-rail stylesheet
