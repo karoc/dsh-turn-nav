@@ -40,6 +40,7 @@ The official built-in `TurnNavigator` has **no off-switch** and is always render
 | Capability | DSH official rail (0.1.3-alpha.1) | Smoothly TN (v0.4.3) |
 |---|---|---|
 | Turns shown | **Every turn** — host `turnOutline` projection (0.1.3+) | Every persisted turn — **client-side** journal read |
+| Full-history robustness | Depends on the host `turnOutline` projection — **not driven** by browser-synthesized sessions (e.g. `?fixture`), where it falls back to the loaded window | Always full — reads the persisted journal directly, no host projection required (verified full on both real and fixture sessions) |
 | How full history is read | Host-side projection embedded in the snapshot | Client pages the persisted journal (`session/page`); older dsh falls back to `sessions.history` RPC — **zero host changes** |
 | Jump to a turn outside the window | ✅ (0.1.3+ unloaded anchor pages history by seq) | ✅ on-demand window extension + "Locating turn N…" pulse/bubble |
 | Long-session open performance | Reads the projection | **Zero prepend** — plain data, no flow re-render, no stall |
@@ -54,6 +55,8 @@ The official built-in `TurnNavigator` has **no off-switch** and is always render
 | Source | Built-in, cannot be disabled | External plugin, **can be replaced/disabled** |
 
 As of dsh 0.1.3 the built-in rail caught up on full-session scope and out-of-window jumps. What still sets Smoothly TN apart: you can **switch it off** (the official rail cannot), the tooltip carries the **timestamp + full summary**, there are **scroll buttons and wave hover**, and it remains an **external, read-only plugin with zero host changes**. And on dsh ≤ 0.1.2 the built-in rail is simpler still (loaded window only), so the gap Smoothly TN closes is even larger there.
+
+**Verified on dsh 0.1.3-alpha.1 (2026-09-06, Playwright against the live web UI)**: on a real 42-turn session both rails show all 42 turns (the official one via its host projection, ours via the journal); on a `?fixture` browser-synthesized session the official rail degrades to the loaded window (24/75) while Smoothly TN still shows all 75 — because our full history never depends on the host projection. Jumps, follow-scroll highlight, the mode switch, and the subtractive takeover of the official rail (`display: none` via the stylesheet override) all verified working.
 
 ## Version map
 
@@ -106,7 +109,7 @@ The plugin registers **two additive slots** — **no DSH source code is modified
 
 ## Compatibility
 
-- DeepSeek Harness (dsh) with the web client (`dsh web`); developed and verified against dsh 0.1.2+ and reviewed against dsh 0.1.3-alpha.1.
+- DeepSeek Harness (dsh) with the web client (`dsh web`); developed and verified against dsh 0.1.2+ and **verified against dsh 0.1.3-alpha.1** (Playwright re-test, 2026-09-06: full-history rail, jumps, follow highlight, mode switch, and the official-rail stylesheet takeover all passing).
 - Requires the `conversation.session.header.utilities` and `settings.general.item` slot declarations (present in current DSH).
 - Default `Smoothly TN` mode hides the official rail (stylesheet override) and centers our rail in its place; `DSH official` mode shows the built-in rail instead; `Hide all` hides both. Both rails auto-hide below 900px width.
 - Coexists with full-screen plugin pages (e.g. the kanban board): the rail sits below their overlay layer.
