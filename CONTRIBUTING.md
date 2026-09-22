@@ -13,7 +13,7 @@ pnpm bundle         # tsdown build → lib/index.js + lib/client.js
 Every release must be done in one pass: code + bilingual README + CHANGELOG + version + tag.
 
 1. Make your changes.
-2. Update `README.md`, `README.zh.md` (same `##`/`###` section counts), and `CHANGELOG.md`.
+2. Update `README.md`, `README.zh.md` (same `##`/`###` section counts), and `CHANGELOG.md` — including every compatibility statement (supported dsh floor / the release for older dsh), re-checked sentence-by-sentence against the code before the tag (the gate checks structure only). Before tagging, run the standing self-check:「我这次改的东西，有没有哪句话、哪个字段的说法现在已经不对了？」 Discipline source: `~/.agents/skills/dsh-plugin-development/SKILL.md` (§6).
 3. Bump `package.json` version.
 4. `git commit && git tag v<version> && git push --tags`.
 5. `pnpm release:check` — verifies version, docs, changelog, tag, tree, build, registry.
