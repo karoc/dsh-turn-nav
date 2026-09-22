@@ -13,7 +13,7 @@
  */
 
 import { useState, useSyncExternalStore } from 'react'
-import { IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutlineRegular, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getRailMode, setRailMode, subscribeRailMode, type RailMode } from './mode.ts'
 import type { TurnNavKey } from './locales.ts'
 
@@ -63,7 +63,7 @@ export function SettingsNavModeRow({ t }: ModeRowProps) {
             onClick={() => { setOpen(value => !value) }}
           >
             {t(selectedLabel)}
-            <IconChevronDownOutline14 className="tn-mode-chevron" />
+            <IconChevronDownOutlineRegular className="tn-mode-chevron" />
           </button>
         )}
       />

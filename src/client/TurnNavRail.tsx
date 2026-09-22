@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, turnOfNodeKey, type ChatSnapshotLike, type ConversationSnapshotLike } from './turns.ts'
 import {
   fetchAllTurns,
@@ -531,7 +531,7 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
         onMouseEnter={() => { if (canScrollUp) startHoverScroll(-1) }}
         onMouseLeave={stopHoverScroll}
       >
-        <IconChevronUpOutline14 size={12} />
+        <IconChevronUpOutlineRegular size={12} />
       </button>
       <div ref={railRef} className="tn-rail">
         {turns.map((entry, i) => {
@@ -567,7 +567,7 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
         onMouseEnter={() => { if (canScrollDown) startHoverScroll(1) }}
         onMouseLeave={stopHoverScroll}
       >
-        <IconChevronDownOutline14 size={12} />
+        <IconChevronDownOutlineRegular size={12} />
       </button>
       {/* On-demand jump feedback: "locating turn N…" bubble next to the clicked
           capsule while the window is being extended, or a brief failure notice.

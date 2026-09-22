@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.5] - 2026-09-23
+
+### Fixed
+
+- **DSH 0.1.7 icon rename (visual-language unification, upstream commit 4937343a5e).** `IconChevronDownOutline14` and `IconChevronUpOutline14` no longer exist in `dsh-client-ui-primitives` (the size suffix moved into the artwork default; the name now carries the stroke weight: `*Regular` = 1 px, `*Medium` = 1.3 px), so each resolved to `undefined` and the Settings → General *Turn navigation* row crashed on render (`React error #130`, `slot entry crashed in 'settings.general.item'`) — the row never appeared. `SettingsNavModeRow.tsx` and `TurnNavRail.tsx` now import the `*Regular` variants — the weight the built-in pages use — and rendered sizes are unchanged (14 px artwork default). **Support floor**: the client half requires dsh ≥ 0.1.7 from this release (the `*Regular` names exist from 0.1.7 on); v0.4.4 remains the release for 0.1.2–0.1.6.
+
+### Tests
+
+- **Re-verified live on DSH 0.1.7-alpha.1** (2026-09-23, isolated DSH_HOME + Playwright): the Settings → General row renders (title, description, mode selector), the mode menu lists DSH official / Smoothly TN / Hide all, the persisted choice applies (`tn-hide-official` on `<body>`), and the browser console is clean. `pnpm test` (typecheck + `scripts/test-client-dispose.mjs`) stays green.
+
 ## [0.4.4] - 2026-09-22
 
 ### Fixed
