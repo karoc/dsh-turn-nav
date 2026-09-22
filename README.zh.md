@@ -68,6 +68,7 @@ dsh 0.1.3 起官方胶囊条已在紧要的全会话范围与窗口外跳转上�
 | v0.2.x – v0.4.1 | dsh 0.1.2+ | 适配 `ui-chat` 重构；通过 journal `session/page` 通道读全量历史；v0.4.1 修复真实轮次号与胶囊条视口跟随 |
 | **v0.4.2** | dsh 0.1.2+（含 **0.1.3-alpha.1**） | 对照 dsh 0.1.3 官方胶囊条更新对比与定位（见上文） |
 | **v0.4.3** | dsh 0.1.2+（含 **0.1.3-alpha.1**） | 本版：品牌命名规范化为 **Smoothly**（思磨力）/ **Smoothly Turn Nav**（**Smoothly TN**）/ **思磨力轮次胶囊条**——技术标识符（npm 包名 `dsh-turn-navigator`、插件/slot ID、locale 命名空间、CSS 前缀、localStorage key）不变 |
+| **v0.4.4** | dsh 0.1.2+，客户端契约对照 **0.1.6-alpha.2** 复核 | 本版：官方胶囊条的 body class 补上 dispose（从 dsh 插件页在线停用/重载后会恢复内置胶囊条）；清掉两个陈旧 `inject` 条目 |
 
 本文 README 的对比对象为 **dsh 0.1.3-alpha.1**；在更旧的 dsh 上官方胶囊条更简单，思磨力轮次胶囊条的优势更大。
 
@@ -111,12 +112,14 @@ dsh web
 
 - DeepSeek Harness (dsh) Web 客户端（`dsh web`）；基于 dsh 0.1.2+ 开发与实测，并在 **dsh 0.1.3-alpha.1 上复测通过**（Playwright 直连实测，2026-09-06：全量历史胶囊条、跳转、跟随高亮、模式开关、官方胶囊条样式接管全部通过）。
 - 需要 `conversation.session.header.utilities` 与 `settings.general.item` slot 声明（当前 DSH 已包含）。
+- 客户端契约已对照 **dsh 0.1.6-alpha.2** 复核（2026-09-22）：`conversation.session.header.utilities`、`settings.general.item`、`shell.overlay` 的 slot 声明、胶囊条用到的 `ui-primitives` 导出、以及它引用的 `--dsw-alias-*` token 均仍存在。0.1.6 上的 Playwright 交互复测**未重跑**（2026-09-06 那次仍是最近一次交互验证）。
 - 默认 `思磨力轮次胶囊条` 模式以样式覆盖隐藏官方 rail，我们的 rail 居中接管；`DSH 官方` 模式显示内置 rail；`全部隐藏` 两者皆隐。900px 以下都自动隐藏。
 - 与全屏插件页面（如看板）共存：胶囊条层级位于全屏 overlay 之下。
 
 ## 开发
 
-- `pnpm typecheck` / `pnpm test` — TypeScript 检查（tsdown 只转译不检查）。
+- `pnpm typecheck` — TypeScript 检查（tsdown 只转译不检查）。
+- `pnpm test` — 类型检查 + `scripts/test-client-dispose.mjs`：在 DOM 桩里加载构建产物，断言官方胶囊条 body class 的 apply/dispose 契约。
 - `pnpm bundle` — 构建模块表 client bundle 到 `lib/`。
 - `scripts/verify-*.mjs` — 针对真实 `dsh web` 的 Playwright 验收脚本（rail、全量历史 journal、模式开关、跳转、反馈、overlay、尺寸、UI）。
 - `pnpm release:check` — 发布门禁（版本、tag、工作树、构建、registry）。

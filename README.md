@@ -68,6 +68,7 @@ Which Smoothly TN release matches which dsh:
 | v0.2.x – v0.4.1 | dsh 0.1.2+ | Adapted to the `ui-chat` refactor; full history via the journal `session/page` channel; v0.4.1 fixed true turn numbers and rail-viewport follow |
 | **v0.4.2** | dsh 0.1.2+, incl. **0.1.3-alpha.1** | Comparison/positioning updated against the 0.1.3 official rail (see above) |
 | **v0.4.3** | dsh 0.1.2+, incl. **0.1.3-alpha.1** | This release: brand naming standardized to **Smoothly**（思磨力）/ **Smoothly Turn Nav**（**Smoothly TN**）/ **思磨力轮次胶囊条** — technical IDs (npm package `dsh-turn-navigator`, plugin/slot IDs, locale namespace, CSS prefix, localStorage key) unchanged |
+| **v0.4.4** | dsh 0.1.2+, client contract re-checked against **0.1.6-alpha.2** | This release: the official-rail body class gained a dispose hook (disabling or reloading the bundle live from the dsh Plugins page restores the built-in rail), and two stale `inject` entries are gone |
 
 The official-rail comparison in this README targets **dsh 0.1.3-alpha.1**; on older dsh the official rail is simpler, so Smoothly TN's advantage is larger there.
 
@@ -111,12 +112,14 @@ The plugin registers **two additive slots** — **no DSH source code is modified
 
 - DeepSeek Harness (dsh) with the web client (`dsh web`); developed and verified against dsh 0.1.2+ and **verified against dsh 0.1.3-alpha.1** (Playwright re-test, 2026-09-06: full-history rail, jumps, follow highlight, mode switch, and the official-rail stylesheet takeover all passing).
 - Requires the `conversation.session.header.utilities` and `settings.general.item` slot declarations (present in current DSH).
+- Client contract re-checked against **dsh 0.1.6-alpha.2** (2026-09-22): the `conversation.session.header.utilities`, `settings.general.item` and `shell.overlay` slot declarations, the `ui-primitives` exports the rail uses, and the `--dsw-alias-*` tokens it references all still exist. The interactive Playwright re-test was **not** re-run on 0.1.6 (the 2026-09-06 run remains the last interactive verification).
 - Default `Smoothly TN` mode hides the official rail (stylesheet override) and centers our rail in its place; `DSH official` mode shows the built-in rail instead; `Hide all` hides both. Both rails auto-hide below 900px width.
 - Coexists with full-screen plugin pages (e.g. the kanban board): the rail sits below their overlay layer.
 
 ## Development
 
-- `pnpm typecheck` / `pnpm test` — TypeScript check (tsdown does not typecheck).
+- `pnpm typecheck` — TypeScript check (tsdown does not typecheck).
+- `pnpm test` — typecheck plus `scripts/test-client-dispose.mjs`, which loads the built bundle in a DOM stub and asserts the apply/dispose contract of the official-rail body class.
 - `pnpm bundle` — build the module-table client bundle into `lib/`.
 - `scripts/verify-*.mjs` — Playwright acceptance scripts against a live `dsh web` (rail, full-history journal, mode switch, jump, feedback, overlay, sizing, UI).
 - `pnpm release:check` — release gates (version, tag, tree, build, registry).

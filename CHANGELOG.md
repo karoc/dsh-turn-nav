@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.4] - 2026-09-22
+
+### Fixed
+
+- **Live disable/reload no longer leaves the OFFICIAL rail hidden.** The plugin hides the built-in rail with a `tn-hide-official` class on `document.body`, but nothing removed that class when the plugin unloaded. dsh 0.1.6-alpha.2 enables the host `hmr` row by default for launcher-provided profiles, so the dsh Plugins page can now disable or reload a bundle **without a restart** — with the stale class the official rail stayed hidden after the plugin was gone, and only a page reload brought it back. The class is now applied inside `ctx.effect(...)` and removed by its dispose hook (`clearModeFromBody`), so unloading restores the built-in default — `src/client/index.ts`, `src/client/mode.ts`.
+
+### Changed
+
+- **Two stale `dsh.client.inject` entries removed** — `@deepseek-ai/dsh-client-runtime` and `@deepseek-ai/dsh-client-web-react`. Neither package exists in the current dsh client graph (the former was removed upstream in dsh 0.1.2, per the 0.4.2 entry below) and this plugin's source never imported either one; `inject` names package rows to order against, so listing absent rows was dead weight. The remaining six entries are unchanged.
+
+### Tests
+
+- **New `scripts/test-client-dispose.mjs`, wired into `pnpm test`.** It loads the real built `lib/client.js` in a minimal DOM + module-loader stub and asserts the observable contract: `apply()` hides the official rail through the body class, and the registered cordis effect's disposer restores it. Verified as a real gate by negative control — replacing the `ctx.effect(...)` wrapper with a bare `applyModeToBody()` makes it fail.
+
 ## [0.4.3] - 2026-09-06
 
 ### Changed

@@ -21,7 +21,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { TurnNavRail, type RailInjected } from './TurnNavRail.tsx'
 import { SettingsNavModeRow, type ModeRowInjected } from './SettingsNavModeRow.tsx'
-import { applyModeToBody } from './mode.ts'
+import { applyModeToBody, clearModeFromBody } from './mode.ts'
 import { en, zh, type TurnNavKey } from './locales.ts'
 import type {
   HistoryApi,
@@ -83,8 +83,15 @@ export function apply(ctx: ClientContext): void {
   // it), so read it structurally to keep both worlds compiling and running.
   const api = (connection as { api?: HistoryApi } | undefined)?.api
 
-  // Sync the official-rail hiding body class with the persisted rail mode.
-  applyModeToBody()
+  // Sync the official-rail hiding body class with the persisted rail mode, and
+  // give it a dispose hook. dsh 0.1.6+ turns the host `hmr` row on by default
+  // for launcher-provided profiles, so this plugin can be disabled or reloaded
+  // LIVE from the dsh Plugins page: without the teardown the stale class would
+  // outlive the plugin and keep hiding the OFFICIAL rail until a page reload.
+  ctx.effect(() => {
+    applyModeToBody()
+    return clearModeFromBody
+  }, 'dsh-turn-navigator: official-rail body class')
 
   // 0.1.2+ full-history channels (both provided by the base web assembly; both
   // absent on older hosts — the rail then degrades gracefully):
