@@ -106,7 +106,76 @@ if (registry.source === 'DSH_POSTPUBLISH_REGISTRY_BASE' || registry.source === '
   console.log(`post-publish-check: ⚠️  not the default registry — verifying against an override`)
 }
 
-/** Three-state registry probe (D19/D25). */
+/**
+ * The proxy npm itself would use, as an environment overlay for CHILD transports.
+ *
+ * Node's fetch ignores npm's `.npmrc` proxy settings, and the proxy variables
+ * plus `NODE_USE_ENV_PROXY` are sampled when the process starts (verified on
+ * Node 24.18: setting them inside the script changes nothing), so the
+ * in-process fetch below goes DIRECT. On a network where the registry is only
+ * reachable through a proxy every probe then degrades to `unknown` and this
+ * check silently verifies nothing — the curl fallbacks are child processes, so
+ * they DO inherit this overlay and keep working. `NO_PROXY` always keeps
+ * loopback direct (the offline fixtures' stub registry lives there).
+ * @returns an env overlay, empty when npm has no proxy configured.
+ */
+function npmProxyEnv() {
+  const overlay = {}
+  for (const [envKey, configKey] of [['HTTPS_PROXY', 'https-proxy'], ['HTTP_PROXY', 'proxy']]) {
+    let configured = ''
+    try {
+      const value = execSync(`npm config get ${configKey}`, { cwd: root, encoding: 'utf8', timeout: 10000 }).trim()
+      if (value !== '' && value !== 'null' && value !== 'undefined') configured = value
+    } catch { /* npm unavailable: no overlay */ }
+    if (configured === '') continue
+    // npm's configured proxy WINS over an inherited variable: this check must
+    // use the same transport as the `npm publish` it verifies. An inherited
+    // variable that differs (e.g. the desktop shell's own forward proxy, which
+    // does not route registry.npmjs.org) would otherwise take precedence for
+    // the curl children and silently break them.
+    const inherited = process.env[envKey] ?? ''
+    if (inherited !== '' && inherited !== configured) {
+      console.log(`post-publish-check: note — ${envKey}=${inherited} is overridden by npm's configured proxy for the curl fallbacks`)
+    }
+    overlay[envKey] = configured
+  }
+  if (Object.keys(overlay).length === 0) return {}
+  const noProxy = (process.env.NO_PROXY ?? process.env.no_proxy ?? '')
+    .split(',').map((entry) => entry.trim()).filter((entry) => entry !== '')
+  for (const host of ['127.0.0.1', 'localhost', '::1']) if (!noProxy.includes(host)) noProxy.push(host)
+  overlay.NO_PROXY = noProxy.join(',')
+  return overlay
+}
+
+const proxyEnv = npmProxyEnv()
+if (Object.keys(proxyEnv).length > 0) {
+  console.log(`post-publish-check: proxy ${proxyEnv.HTTPS_PROXY ?? proxyEnv.HTTP_PROXY} (from npm config; used by the curl fallbacks)`)
+}
+
+/** Registry JSON probe through curl — a child process, so the proxy overlay applies. */
+function curlProbe(path, timeoutMs) {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-postpublish-'))
+  const body = join(dir, 'body.json')
+  try {
+    const result = spawnSync(
+      'curl',
+      ['-sS', '-o', body, '-w', '%{http_code}', '--max-time', String(Math.ceil(timeoutMs / 1000)), `${registry.base}/${path}`],
+      { maxBuffer: MAX_BUFFER, env: { ...process.env, ...proxyEnv } },
+    )
+    if (result.error?.code === 'ENOENT' || result.status === 127) return { kind: 'no-curl' }
+    if (result.status !== 0) return { kind: 'unknown', error: new Error(`curl exited ${result.status}`) }
+    const status = Number.parseInt(String(result.stdout ?? '').trim(), 10)
+    if (status === 404) return { kind: 'absent' }
+    if (!(status >= 200 && status < 300)) return { kind: 'unknown', error: new Error(`HTTP ${status}`) }
+    return { kind: 'data', doc: JSON.parse(readFileSync(body, 'utf8')) }
+  } catch (error) {
+    return { kind: 'unknown', error }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+/** Three-state registry probe (D19/D25). Falls back to curl when a proxy is configured. */
 async function probe(path, timeoutMs = 10000) {
   try {
     const response = await fetch(`${registry.base}/${path}`, { signal: AbortSignal.timeout(timeoutMs) })
@@ -114,6 +183,13 @@ async function probe(path, timeoutMs = 10000) {
     if (!response.ok) return { kind: 'unknown', error: new Error(`HTTP ${response.status}`) }
     return { kind: 'data', doc: await response.json() }
   } catch (error) {
+    // The in-process fetch cannot use npm's proxy (see npmProxyEnv); a
+    // configured proxy means curl is the only transport that can reach the
+    // registry here, so try it before reporting the probe as unknown.
+    if (Object.keys(proxyEnv).length > 0) {
+      const viaCurl = curlProbe(path, timeoutMs)
+      if (viaCurl.kind !== 'no-curl') return viaCurl
+    }
     return { kind: 'unknown', error }
   }
 }
@@ -254,7 +330,7 @@ function curlTarball(url) {
     const result = spawnSync(
       'curl',
       ['-fsS', '-o', body, '-w', '%{http_code}', '--max-time', String(Math.ceil(TARBALL_TIMEOUT_MS / 1000)), url],
-      { maxBuffer: MAX_BUFFER },
+      { maxBuffer: MAX_BUFFER, env: { ...process.env, ...proxyEnv } },
     )
     if (result.error?.code === 'ENOENT' || result.status === 127) return { kind: 'no-curl' }
     const status = Number.parseInt(String(result.stdout ?? '').trim(), 10)

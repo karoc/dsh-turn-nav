@@ -21,6 +21,16 @@ Every release must be done in one pass: code + bilingual README + CHANGELOG + ve
 7. `npm publish` (requires 2FA; the agent cannot do this step).
 8. `postpublish` runs `scripts/post-publish-check.mjs` automatically.
 
+## The release gates use npm's own transport
+
+`release-check.mjs` asks `npm view` whether the version is already published, and
+`post-publish-check.mjs` gives its curl fallbacks npm's configured proxy — both on
+purpose. Node's `fetch` cannot be proxied after startup (the proxy variables and
+`NODE_USE_ENV_PROXY` are sampled at process start) and ignores `.npmrc` entirely, so
+a fetch-based gate goes direct and blocks every release on a network where the
+registry is only reachable through the proxy in `.npmrc` — even though
+`npm publish` itself would work. Keep new registry access on the npm/curl path.
+
 ## npm publish is manual (2FA)
 
 npm accounts with two-factor authentication require an OTP that the agent cannot provide. The agent prepares everything to "one command to publish"; the human runs `npm login` → `npm publish`.

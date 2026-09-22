@@ -206,26 +206,34 @@ const packageName = JSON.parse(read('package.json')).name
 const registry = resolveRegistry()
 console.log(`release-check: registry ${registry.base} (source: ${registry.source})`)
 
-/** Three-state probe: absent (definite 404 / no such version) | published | unknown. */
+/**
+ * Three-state probe: absent (definite 404 / no such version) | published | unknown.
+ *
+ * Transport: the **npm CLI**, not `fetch`. Node's fetch ignores npm's `.npmrc`
+ * proxy settings entirely, and the proxy variables plus `NODE_USE_ENV_PROXY`
+ * are sampled when the process starts (verified on Node 24.18: setting them
+ * inside the script changes nothing), so a bare fetch goes DIRECT. On a network
+ * where registry.npmjs.org is only reachable through a proxy this gate then
+ * failed every release while `npm publish` itself — which does honor `.npmrc` —
+ * would have worked: on 2026-09-22 three probe timeouts blocked the 0.4.4
+ * publish with `The operation was aborted due to timeout`. `npm view` uses the
+ * same registry, proxy and auth configuration as the publish it guards.
+ */
 async function probePublished() {
   let lastError
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const response = await fetch(`${registry.base}/${encodeURIComponent(packageName)}`, {
-        signal: AbortSignal.timeout(10000),
-      })
-      if (response.status === 404) return { state: 'absent' }
-      if (response.ok) {
-        const doc = await response.json()
-        const published = typeof doc?.versions === 'object' && doc.versions !== null
-          && doc.versions[version] !== undefined
-        return { state: published ? 'published' : 'absent' }
-      }
-      lastError = new Error(`registry answered HTTP ${response.status}`)
-      console.log(`release-check: probe attempt ${attempt}/3 → HTTP ${response.status}`)
+      const raw = run(`npm view ${packageName} versions --json --registry ${registry.base}`, { timeout: 30000 })
+      const parsed = JSON.parse(raw)
+      // A single published version comes back as a bare string, several as an array.
+      const versions = Array.isArray(parsed) ? parsed : [parsed]
+      return { state: versions.includes(version) ? 'published' : 'absent' }
     } catch (error) {
-      lastError = error
-      console.log(`release-check: probe attempt ${attempt}/3 → ${String(error?.message ?? error).split('\n')[0]}`)
+      const text = [error?.stdout, error?.stderr, error?.message].filter(Boolean).join('\n')
+      // E404 = the package itself is not on this registry → nothing to collide with.
+      if (/\bE404\b|\b404 Not Found\b/.test(text)) return { state: 'absent' }
+      lastError = new Error(text.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? String(error))
+      console.log(`release-check: probe attempt ${attempt}/3 → ${lastError.message}`)
     }
     if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 2000))
   }
