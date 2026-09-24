@@ -70,8 +70,9 @@ Which Smoothly TN release matches which dsh:
 | **v0.4.3** | dsh 0.1.2+, incl. **0.1.3-alpha.1** | This release: brand naming standardized to **Smoothly**（思磨力）/ **Smoothly Turn Nav**（**Smoothly TN**）/ **思磨力轮次胶囊条** — technical IDs (npm package `dsh-turn-navigator`, plugin/slot IDs, locale namespace, CSS prefix, localStorage key) unchanged |
 | **v0.4.4** | dsh 0.1.2+, client contract re-checked against **0.1.6-alpha.2** | This release: the official-rail body class gained a dispose hook (disabling or reloading the bundle live from the dsh Plugins page restores the built-in rail), and two stale `inject` entries are gone |
 | **v0.4.5** | dsh **0.1.7+** | This release: icon imports follow the 0.1.7 visual-language rename (`*Regular` stroke variants; rendered sizes unchanged) — the client half requires 0.1.7 from here; **v0.4.4 remains the release for 0.1.2–0.1.6** |
+| **v0.4.6** | dsh **0.1.7+** | This release: the 0.1.7 floor is declared as an optional peer dependency on `@deepseek-ai/dsh-client-ui-conversation` — an older dsh refuses to load the rail and prints the exact `dsh plugin allow-version` remedy instead of crashing a slot at render time. No behaviour change |
 
-The official-rail comparison in this README targets **dsh 0.1.3-alpha.1**; on older dsh the official rail is simpler, so Smoothly TN's advantage is larger there.
+The official-rail comparison in this README targets **dsh 0.1.3-alpha.1**; on older dsh the official rail is simpler, so Smoothly TN's advantage is larger there. Since **v0.4.6** the 0.1.7 floor is enforced by dsh itself (see the version map above).
 
 ## Installation
 

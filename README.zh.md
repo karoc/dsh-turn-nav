@@ -70,8 +70,9 @@ dsh 0.1.3 起官方胶囊条已在紧要的全会话范围与窗口外跳转上�
 | **v0.4.3** | dsh 0.1.2+（含 **0.1.3-alpha.1**） | 本版：品牌命名规范化为 **Smoothly**（思磨力）/ **Smoothly Turn Nav**（**Smoothly TN**）/ **思磨力轮次胶囊条**——技术标识符（npm 包名 `dsh-turn-navigator`、插件/slot ID、locale 命名空间、CSS 前缀、localStorage key）不变 |
 | **v0.4.4** | dsh 0.1.2+，客户端契约对照 **0.1.6-alpha.2** 复核 | 本版：官方胶囊条的 body class 补上 dispose（从 dsh 插件页在线停用/重载后会恢复内置胶囊条）；清掉两个陈旧 `inject` 条目 |
 | **v0.4.5** | dsh **0.1.7+** | 本版：图标导入跟随 0.1.7 视觉语言改名（`*Regular` 笔画变体，渲染尺寸不变）——客户端半区自此要求 0.1.7；**0.1.2–0.1.6 请用 v0.4.4** |
+| **v0.4.6** | dsh **0.1.7+** | 本版：0.1.7 下限改为对 `@deepseek-ai/dsh-client-ui-conversation` 声明的可选 peer 依赖——旧 dsh 会拒绝加载本插件并打印 `dsh plugin allow-version` 的具体解法，而不是等到渲染时崩掉某个 slot；无行为变化 |
 
-本文 README 的对比对象为 **dsh 0.1.3-alpha.1**；在更旧的 dsh 上官方胶囊条更简单，思磨力轮次胶囊条的优势更大。
+本文 README 的对比对象为 **dsh 0.1.3-alpha.1**；在更旧的 dsh 上官方胶囊条更简单，思磨力轮次胶囊条的优势更大。自 **v0.4.6** 起该下限由 dsh 自身强制（见上方版本对照）。
 
 ## 安装
 

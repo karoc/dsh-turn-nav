@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.4.6] - 2026-09-25
+
+### Changed
+
+- **The dsh floor is now declared as a peer dependency, not only documented.**
+  `package.json` declares an optional peer on
+  `@deepseek-ai/dsh-client-ui-conversation: ">=0.1.7-rc.1"`. DSH ≥ 0.1.7
+  evaluates every `@deepseek-ai/dsh*` peer against its own runtime version, so an
+  older dsh refuses to load the rail and prints the exact
+  `dsh plugin allow-version` remedy instead of crashing a slot at render time.
+  It is marked `peerDependenciesMeta.optional` because the host supplies that
+  package at runtime — npm therefore installs nothing extra. The prerelease rule
+  the range encodes: `>=0.1.7` (or `^0.1.7`) does **not** match a `0.1.7-rc.N`
+  runtime, hence the explicit `-rc.1` floor.
+
+### Tests
+
+- **Type-checked against DSH 0.1.7-rc.2** (2026-09-25): `tsc --noEmit` is green
+  with the rc.2 type surface — the `conversation.session.header.utilities` and
+  `settings.general.item` slot contracts, the `session/page` remote contract and
+  every imported symbol are unchanged or purely additive in rc.2. No runtime pass
+  on rc.2 was done in that sweep.
+
 ## [0.4.5] - 2026-09-23
 
 ### Fixed
