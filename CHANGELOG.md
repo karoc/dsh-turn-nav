@@ -47,7 +47,7 @@
 
 ### Changed
 
-- **Two stale `dsh.client.inject` entries removed** — `@deepseek-ai/dsh-client-runtime` and `@deepseek-ai/dsh-client-web-react`. Neither package exists in the current dsh client graph (the former was removed upstream in dsh 0.1.2, per the 0.4.2 entry below) and this plugin's source never imported either one; `inject` names package rows to order against, so listing absent rows was dead weight. The remaining six entries are unchanged.
+- **Two stale `dsh.client.inject` entries removed** — `@deepseek-ai/dsh-client-runtime` and `@deepseek-ai/dsh-client-web-react`. Neither package exists in the current dsh client graph (the former was removed upstream in dsh 0.1.2, per the 0.2.0 entry below) and this plugin's source never imported either one; `inject` names package rows to order against, so listing absent rows was dead weight. The remaining six entries are unchanged.
 
 ### Tests
 
@@ -57,7 +57,7 @@
 
 ### Changed
 
-- **Brand naming standardized**: the product is now **Smoothly Turn Nav**（简称 **Smoothly TN**，品牌英文 **Smoothly** / 品牌中文 **思磨力**；中文名 **思磨力轮次胶囊条**），replacing the previous "DSH Smoothly Turn Nav (DSH STN)". Applied everywhere user-visible: bilingual README (title, features, comparison table, version map, usage, compatibility), `package.json` description + keywords, the Settings → General *Turn navigation* rail-mode labels (`Smoothly TN` / `思磨力轮次胶囊条`), code comments, and the verify-mode acceptance assertion. **Technical identifiers are intentionally unchanged and decoupled from the brand**: npm package name, plugin/slot IDs, locale namespace, CSS prefix, and the localStorage mode key all remain `dsh-turn-navigator` — installed profiles, persisted preferences, and the bundle URL are untouched. Historical documents (`docs/official-vs-ours.md`, past changelog entries) keep their original naming.
+- **Brand naming standardized**: the product is now **Smoothly Turn Nav**（简称 **Smoothly TN**，品牌英文 **Smoothly** / 品牌中文 **思磨力**；中文名 **思磨力轮次胶囊条**），replacing the previous "DSH Smoothly Turn Nav (DSH STN)". Applied everywhere user-visible: bilingual README (title, features, comparison table, version map, usage, compatibility), `package.json` description + keywords, the Settings → General *Turn navigation* rail-mode labels (`Smoothly TN` / `思磨力轮次胶囊条`), code comments, and the verify-mode acceptance assertion. **Technical identifiers are intentionally unchanged and decoupled from the brand**: npm package name, plugin/slot IDs, locale namespace, CSS prefix, and the localStorage mode key all remain `dsh-turn-navigator`-based (the mode key itself is `dsh-turn-navigator.mode`) — installed profiles, persisted preferences, and the bundle URL are untouched. Historical documents (`docs/official-vs-ours.md`, past changelog entries) keep their original naming.
 
 ## [0.4.2] - 2026-09-05
 
@@ -81,8 +81,6 @@
 - **Subtractive takeover of the official rail**: the official built-in TurnNavigator has no off-switch, so in `DSH STN` mode it is hidden with a container-scoped stylesheet override (`body.tn-hide-official [data-conversation-scroll] nav { display: none !important }` — our rail is fixed OUTSIDE the conversation scroll container, so the rule cannot match ours), and our rail takes over the right-edge center position. `Hide all` hides both.
 - **Official-rail detection fix**: the old check matched `nav[aria-label*="轮次"/"Turn navigation"]` anywhere, which also matched OUR OWN rail (same localized label) — so the rail stayed nudged into the header zone even when the official rail was absent (e.g. 1-turn sessions). The check is now scoped to `[data-conversation-scroll]` and reads the COMPUTED display value, so the nudge follows reality: official visible → we nudge; official hidden by our override → we stay centered.
 - **Brand name**: DSH Smoothly Turn Nav (DSH STN) — used in the README, settings row, and changelog.
-
-# Changelog
 
 ## [0.3.0] - 2026-08-29
 
