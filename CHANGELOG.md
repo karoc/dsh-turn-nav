@@ -21,6 +21,13 @@
 
 ### Tests
 
+- **`npm run verify:all` — every gate, one command, bound to the commit.**
+  Runs the new scripts' syntax, the type check + dispose contract, the guarantee
+  gate, the negative controls and the release gate, writing
+  `{ts, commit, node, steps[]}` to the gitignored `lib/verify-report.json`.
+  `npm run verify:fresh` FAILS when HEAD no longer matches the recorded commit —
+  this repo re-points tags for unpublished versions, so a quoted green state is
+  worth nothing without its commit.
 - **Negative controls, now part of `npm test`** (`npm run test:controls`).
   `scripts/test-negative-controls.mjs` clones the committed tree per scenario,
   injects ONE defect and asserts the responsible gate fails with the documented
