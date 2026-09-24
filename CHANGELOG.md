@@ -21,6 +21,14 @@
 
 ### Tests
 
+- **Negative controls, now part of `npm test`** (`npm run test:controls`).
+  `scripts/test-negative-controls.mjs` clones the committed tree per scenario,
+  injects ONE defect and asserts the responsible gate fails with the documented
+  message: dirty tree, removed CHANGELOG entry, deleted release tag, removed
+  build artifact, and a guarantee row whose pinning assertion is gone — plus a
+  positive control. A mutation that does NOT apply is reported as a failure
+  (the first version of this file had a no-op mutation, and the harness caught
+  it instead of letting the scenario pass for the wrong reason).
 - **Guarantee gate, now part of `npm test`.** `docs/guarantees.md` separates the
   7 promises that ARE pinned by an assertion in `scripts/test-client-dispose.mjs`
   — the plugin id it registers under, the `apply()`/`dispose()` contract (dispose
