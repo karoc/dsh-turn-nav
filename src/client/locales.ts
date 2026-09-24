@@ -3,6 +3,8 @@
 /** English strings (the key-set source of truth for this pair). */
 export const en = {
   rail: 'Turn navigation',
+  scrollUp: 'Scroll rail up',
+  scrollDown: 'Scroll rail down',
   turnLabel: 'Turn {n}',
   noSummary: '(no user message)',
   locatingTurn: 'Locating turn {n}…',
@@ -21,6 +23,8 @@ export type TurnNavKey = keyof typeof en
 /** Chinese strings (same keys as {@link en}). */
 export const zh: { [Key in keyof typeof en]: string } = {
   rail: '轮次导航',
+  scrollUp: '向上滚动胶囊条',
+  scrollDown: '向下滚动胶囊条',
   turnLabel: '第 {n} 轮',
   noSummary: '（无用户消息）',
   locatingTurn: '正在定位第 {n} 轮…',

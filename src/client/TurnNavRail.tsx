@@ -527,7 +527,7 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
       <button
         type="button"
         className="tn-scroll-btn"
-        aria-label="scroll rail up"
+        aria-label={t('scrollUp')}
         disabled={!canScrollUp}
         onClick={() => scrollRail(railRef.current, -1)}
         onMouseEnter={() => { if (canScrollUp) startHoverScroll(-1) }}
@@ -563,7 +563,7 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
       <button
         type="button"
         className="tn-scroll-btn"
-        aria-label="scroll rail down"
+        aria-label={t('scrollDown')}
         disabled={!canScrollDown}
         onClick={() => scrollRail(railRef.current, 1)}
         onMouseEnter={() => { if (canScrollDown) startHoverScroll(1) }}
