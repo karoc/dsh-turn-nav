@@ -117,6 +117,7 @@ The plugin registers **two additive slots** — **no DSH source code is modified
 - Client contract re-checked against **dsh 0.1.6-alpha.2** (2026-09-22): the `conversation.session.header.utilities` and `settings.general.item` slot declarations, the `ui-primitives` exports the rail uses, and the `--dsw-alias-*` tokens it references all still exist. The interactive Playwright re-test was **not** re-run on 0.1.6 (the 2026-09-06 run remains the last interactive verification).
 - Default `Smoothly TN` mode hides the official rail (stylesheet override) and centers our rail in its place; `DSH official` mode shows the built-in rail instead; `Hide all` hides both. Both rails auto-hide below 900px width.
 - Coexists with DSH global panels (e.g. the kanban board): a panel takes over the `main` slot entry, so the conversation view (and this rail with it) is swapped out rather than layered under.
+- **Known limitation (DOM fallback)**: when there is no session store to read (older hosts), the rail extends the window by clicking the flow's own paging control, and that path recognises only the control's **Chinese and English** labels (idle and in-flight) — on a third-language shell it cannot extend the window. The primary journal path (dsh 0.1.2+) does not read labels at all.
 
 ## Development
 
