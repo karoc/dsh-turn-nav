@@ -21,6 +21,14 @@
 
 ### Tests
 
+- **Guarantee gate, now part of `npm test`.** `docs/guarantees.md` separates the
+  7 promises that ARE pinned by an assertion in `scripts/test-client-dispose.mjs`
+  — the plugin id it registers under, the `apply()`/`dispose()` contract (dispose
+  must remove the body class so the official rail comes back), the header and
+  settings registrations — from the promises that are true by construction but
+  have **no** automated pin (no data leaves the browser, no conversation writes,
+  mode persistence, style bounds). `scripts/check-guarantees.mjs` fails the suite
+  when a pinned assertion disappears. Verified by negative control.
 - **Type-checked against DSH 0.1.7-rc.2** (2026-09-25): `tsc --noEmit` is green
   with the rc.2 type surface — the `conversation.session.header.utilities` and
   `settings.general.item` slot contracts, the `session/page` remote contract and
