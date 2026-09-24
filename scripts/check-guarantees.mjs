@@ -30,7 +30,11 @@ try {
 }
 
 const sources = readdirSync(join(root, 'scripts'))
-  .filter((name) => name.startsWith('test-') && name.endsWith('.mjs'))
+  // NB: the negative-controls harness is NOT a source of pins. It writes bogus
+  // selectors into a clone while proving this gate is load-bearing, and if it
+  // were scanned those injected strings would "pin" the very rows they are
+  // meant to break (found by that harness, 2026-09-25).
+  .filter((name) => name.startsWith('test-') && name.endsWith('.mjs') && name !== 'test-negative-controls.mjs')
   .map((name) => readFileSync(join(root, 'scripts', name), 'utf8'))
   .join('\n')
 

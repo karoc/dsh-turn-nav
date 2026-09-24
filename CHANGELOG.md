@@ -23,7 +23,9 @@
 
 - **`npm run verify:all` — every gate, one command, bound to the commit.**
   Runs the new scripts' syntax, the type check + dispose contract, the guarantee
-  gate, the negative controls and the release gate, writing
+  gate (whose source set deliberately EXCLUDES the controls harness — otherwise
+  the bogus selectors it injects would "pin" the rows they are meant to break),
+  the negative controls and the release gate, writing
   `{ts, commit, node, steps[]}` to the gitignored `lib/verify-report.json`.
   `npm run verify:fresh` FAILS when HEAD no longer matches the recorded commit —
   this repo re-points tags for unpublished versions, so a quoted green state is
