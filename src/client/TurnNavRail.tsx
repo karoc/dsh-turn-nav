@@ -8,14 +8,16 @@
  * Registered into `conversation.session.header.utilities` (session scope), so
  * this component reads the live `ConversationSnapshot` via `useSession`.
  *
- * DATA & PERFORMANCE: the rail's turn list is read from the HOST through the
- * `sessions.history` browser→host RPC — every persisted turn (including ones
- * far outside the conversation's window) is shown as plain data, with ZERO
- * prepends into the conversation flow. The flow window is only extended
- * (via the "Load earlier" paging button) on demand, when a capsule is
- * clicked to jump to a turn that is not yet in the window. This keeps a very
- * long conversation (hundreds of turns) responsive: opening it never re-
- * renders the flow, and jumping loads only what is needed to reach the target.
+ * DATA & PERFORMANCE: the rail's turn list is read from the persisted log as
+ * plain data — the 0.1.2+ journal channel (`ctx.remote.session.page`) first,
+ * the legacy `sessions.history` browser→host RPC on older hosts — so every
+ * persisted turn (including ones far outside the conversation's window) is
+ * shown with ZERO prepends into the conversation flow. The flow window is only
+ * extended on demand, when a capsule for a turn outside it is clicked: through
+ * the official session store's `loadOlder` (0.1.2+), or by clicking the flow's
+ * own "Load earlier" button on older hosts. This keeps a very long
+ * conversation (hundreds of turns) responsive: opening it never re-renders the
+ * flow, and jumping loads only what is needed to reach the target.
  */
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'

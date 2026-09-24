@@ -243,7 +243,7 @@ export function firstNodeKeyOfTurn(
  *
  * Used by the scroll-follow highlight: the scroll listener finds the topmost
  * visible `[data-chat-anchor-key]` row, then this function maps its key back
- * to a turn number so the drawer can highlight the matching entry.
+ * to a turn number so the rail can highlight the matching entry.
  *
  * @param snap - the conversation snapshot.
  * @param key - the chat-node key from the DOM anchor.

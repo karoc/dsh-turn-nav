@@ -13,9 +13,11 @@ export const TURN_NAV_STYLES = `
    The whole wrapper is pointer-events:auto so the wheel scrolls the rail
    anywhere on it; buttons sit above and below the rail.
    z-index is deliberately LOW (10): above the conversation flow content
-   (max 8) but below full-screen overlays like the kanban board plugin
-   (z-index 50) — same order of magnitude as the header's "Session log"
-   button, so an open full-screen page always paints over the rail. */
+   (max 8) but below the shell's own overlay layers — same order of magnitude
+   as the header's "Session log" button, so anything the shell paints over the
+   conversation also paints over the rail. A DSH global panel (e.g. the kanban
+   board) takes over the 'main' slot entry instead of overlaying, so the rail
+   is not rendered while one is open. */
 .tn-wrap {
   position: fixed;
   right: 6px;

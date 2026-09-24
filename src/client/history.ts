@@ -1,8 +1,9 @@
 /**
- * Session-history reading: fetch the conversation's persisted history from the
- * HOST via the browser→host RPC `sessions.history`, and derive the full turn
- * list (turn number, timestamp, first user-message summary) WITHOUT rendering
- * anything into the conversation flow.
+ * Session-history reading: fetch the conversation's persisted history as data
+ * and derive the full turn list (turn number, timestamp, first user-message
+ * summary) WITHOUT rendering anything into the conversation flow. Two channels:
+ * the 0.1.2+ journal (`ctx.remote.session.page` — {@link fetchJournalTurns})
+ * and the legacy browser→host RPC `sessions.history` ({@link fetchAllTurns}).
  *
  * This is the key to the rail's performance: the conversation flow is
  * windowed (only a page of events is materialized as DOM), and extending it

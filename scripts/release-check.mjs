@@ -155,17 +155,15 @@ if (stale.length > 0) {
   fail(`build output is stale (src/ newer than ${stale.join(", ")}) — run \`npm run bundle\` first`)
 }
 
-// 8. not already published — probed DIRECTLY against the registry index with
-// the built-in fetch (never the npm CLI: `npm view <pkg>@<missing>` prints a
-// 9-line E404 block per probe, which once drowned a successful publish in
-// 404s). The FULL package document is read, not the version endpoint: that
-// endpoint intermittently answers HTTP 406 for the abbreviated-metadata accept
-// header even for long-published versions, which would misread an
-// already-published version as "safe to publish".
+// 8. not already published — probed through the npm CLI (`npm view <pkg>
+// versions --json`), the same registry/proxy/auth configuration as the publish
+// it guards; the transport rationale lives on probePublished() below. The
+// VERSION LIST is read, so only a definite "package absent (E404)" or a list
+// without this version means unpublished.
 //
-// Grading: a definite 404 (or a 200 without this version) means unpublished;
-// any other non-2xx answer or a transport failure BLOCKS the release after two
-// bounded retries — "the probe failed" must never read as "safe to publish".
+// Grading: a definite E404 or a returned list without this version means
+// unpublished; any other failure BLOCKS the release after three bounded
+// attempts — "the probe failed" must never read as "safe to publish".
 // DSH_RELEASE_ALLOW_REGISTRY_UNREACHABLE=1 is the deliberate override.
 
 /** `registry = <url>` from one .npmrc, normalized (trailing slashes removed). */
