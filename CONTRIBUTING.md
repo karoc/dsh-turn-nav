@@ -11,8 +11,8 @@ pnpm test           # typecheck + dispose contract + turn labels + guarantees + 
 
 ## Verification gates
 
-Four surfaces, in increasing cost — run the cheap ones always, the last one
-before a release:
+Four OFFLINE surfaces, in increasing cost — run the cheap ones always, the last
+one before a release:
 
 | gate | command | what it pins |
 |---|---|---|
