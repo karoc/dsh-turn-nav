@@ -5,8 +5,10 @@ export const en = {
   rail: 'Turn navigation',
   scrollUp: 'Scroll rail up',
   scrollDown: 'Scroll rail down',
+  // Tooltip body fallback when a turn has no human prompt (machine-woken turn,
+  // compaction checkpoint, mid-turn window head): the turn is labelled by its
+  // NUMBER — the official rail does the same and has no placeholder string.
   turnLabel: 'Turn {n}',
-  noSummary: '(no user message)',
   locatingTurn: 'Locating turn {n}…',
   locateFailed: 'Could not locate turn {n}',
   // Settings → General preference row (which rail to show).
@@ -26,7 +28,6 @@ export const zh: { [Key in keyof typeof en]: string } = {
   scrollUp: '向上滚动胶囊条',
   scrollDown: '向下滚动胶囊条',
   turnLabel: '第 {n} 轮',
-  noSummary: '（无用户消息）',
   locatingTurn: '正在定位第 {n} 轮…',
   locateFailed: '无法定位第 {n} 轮',
   modeRowTitle: '轮次导航',

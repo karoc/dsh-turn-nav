@@ -25,6 +25,8 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, turnOfNodeKey, type ChatSnapshotLike, type ConversationSnapshotLike } from './turns.ts'
+import { mergeRailTurns, type OutlineTurnLike } from './merge.ts'
+import { tooltipText } from './label.ts'
 import {
   fetchAllTurns,
   fetchJournalTurns,
@@ -51,10 +53,14 @@ export interface RailTurn {
  *  `useSession` now yields SessionSnapshot (lifecycle fields), `useChat`
  *  yields ChatSnapshot (the turn data we read). We type `useSession` loosely
  *  (it is only used as a legacy fallback on older dsh where it carried the
- *  old `.chat`-wrapped snapshot) and read turn data from `useChat`. */
+ *  old `.chat`-wrapped snapshot) and read turn data from `useChat`.
+ *  `useProjection` is the same standard kit's key-addressed host-projection
+ *  reader (`ui-session`'s SessionStandardProps) — absent only on hosts that
+ *  predate it, hence optional. */
 interface SessionStandardProps {
   useSession?: <T,>(selector: (snapshot: unknown) => T) => T
   useChat?: <T,>(selector: (chat: ChatSnapshotLike) => T) => T
+  useProjection?: <T,>(key: string) => T | undefined
   sessionId?: string
 }
 
@@ -125,38 +131,23 @@ function clampFeedbackY(y: number): number {
   return Math.max(24, Math.min(y, window.innerHeight - 24))
 }
 
-/** Tooltip body for one turn: turn number, time, full summary. */
-function tooltipText(entry: RailTurn, t: (key: TurnNavKey, params?: Record<string, unknown>) => string): string {
-  const time = formatTime(entry.startTime)
-  // The label is the TRUE turn number (`entry.turn`), not a list position:
-  // window-only extras carry a window-local index (restarting at 1), which
-  // made merged lists show e.g. "第 38 轮" followed by "第 2 轮".
-  const label = t('turnLabel', { n: String(entry.turn) })
-  const body = entry.fullText || entry.summary || t('noSummary')
-  const lines = [label]
-  if (time !== '') lines.push(time)
-  lines.push(body)
-  return lines.join('\n')
-}
-
-/** Short HH:MM from a Unix-epoch-ms timestamp. */
-function formatTime(ms: number | undefined): string {
-  if (ms === undefined || ms === null || !Number.isFinite(ms)) return ''
-  const date = new Date(ms)
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
 /**
  * The piano-key rail. Session scope: reads the conversation snapshot directly
  * and renders a floating vertical capsule per turn (full history read from
  * the host as data; the flow window is extended only on click-to-jump).
  */
-export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, sessionAccess }: RailProps) {
+export function TurnNavRail({ useSession, useChat, useProjection, sessionId, t, api, journal, sessionAccess }: RailProps) {
   // New (0.1.2+): conversation data comes from `useChat` (ChatSnapshot).
   // Legacy fallback: on older dsh `useSession` returned the old `.chat`-wrapped
   // snapshot — typed loosely here, narrowed by unwrapChat at read time.
   const legacySession = useSession?.((s: unknown) => s) as ConversationSnapshotLike | undefined
   const chat = useChat?.((c: ChatSnapshotLike) => c)
+  // Host-computed whole-log outline: `{ turn, seq, prompt, response }[]`, its
+  // prompt filled from HUMAN messages only. The official rail merges it under
+  // the loaded-window previews (`mergeTurnRailItems`); we use it as the label
+  // fallback our two read channels cannot provide (a turn whose loaded nodes
+  // hold no human node, a mid-turn window head, a missed journal page).
+  const outline = useProjection?.<readonly OutlineTurnLike[]>('turnOutline')
   // Latest chat for async handlers (click-to-jump reads it after loads).
   const chatRef = useRef<ChatSnapshotLike | ConversationSnapshotLike | undefined>(chat ?? legacySession)
   chatRef.current = chat ?? legacySession
@@ -254,19 +245,16 @@ export function TurnNavRail({ useSession, useChat, sessionId, t, api, journal, s
   // the official rail via the stylesheet override), 'official'/'hidden' hide us.
   const railMode = useSyncExternalStore(subscribeRailMode, getRailMode)
 
-  // Display list: full history, plus any window-only (latest, still-running)
-  // turns not yet persisted, ordered by turn number. The merged list
-  // re-derives `index` as the list position — sources assign it over their
-  // OWN subset (history pages start at 1, window extras restart at 1), so a
-  // raw merge leaves duplicate/wrong indices.
-  const turns = useMemo<RailTurn[]>(() => {
-    if (historyTurns.length === 0) return windowTurns
-    const historySet = new Set(historyTurns.map((entry) => entry.turn))
-    const extras = windowTurns.filter((entry) => !historySet.has(entry.turn))
-    return [...historyTurns, ...extras]
-      .sort((a, b) => a.turn - b.turn)
-      .map((entry, i) => ({ ...entry, index: i + 1 }))
-  }, [historyTurns, windowTurns])
+  // Display list: journal turns merged with the window's, each labelled from the
+  // first channel that actually read a human prompt (journal → window → host
+  // outline). Sources assign `index` over their OWN subset (history pages start
+  // at 1, window extras restart at 1), so the merge re-derives the position —
+  // and a blank entry from one channel never shadows a labelled one from
+  // another (`merge.ts`, the official `mergeTurnRailItems` rule).
+  const turns = useMemo<RailTurn[]>(
+    () => mergeRailTurns(historyTurns, windowTurns, outline),
+    [historyTurns, windowTurns, outline],
+  )
 
   // Follow-scroll active turn: the turn owning the reading line (top of the
   // visible transcript + a small inset), re-evaluated on scroll via rAF.

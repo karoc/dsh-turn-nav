@@ -70,9 +70,18 @@ export interface TurnEntry {
   turn: number
   /** Position within THIS source's list (the merged rail list re-derives it). */
   index: number
-  /** First ~80 chars of the first user message in this turn. */
+  /**
+   * Bounded first-human-prompt preview the HOST derived for this turn (its
+   * `prompt` projection), or `''` when the loaded window holds no human prompt
+   * node for the turn (a machine-woken turn: goal continuation, plugin waking,
+   * subagent settlement; also a mid-turn window head). An empty summary is
+   * resolved at LABEL time — the rail falls back to the localized turn number
+   * or to the host `turnOutline` prompt (`merge.ts`, mirroring the official
+   * rail). Never fabricate display text here: a placeholder would shadow both
+   * fallbacks and lie about the turn.
+   */
   summary: string
-  /** Full first user-message text (for tooltip / accessibility). */
+  /** Same source as `summary` (the host's bounded preview is all a window turn carries). */
   fullText: string
   /** Unix epoch ms from turnTimings or turn.start. */
   startTime: number | undefined
@@ -106,6 +115,11 @@ function firstText(content: readonly { type: string; text?: string }[] | undefin
  * `ConversationSnapshot` (which had a `.chat` field) — so an upgrade never
  * crashes if the host is still on the older shape.
  *
+ * Turns without a human prompt (the host classifies every non-human
+ * `user/message` source as a `context`/`turn-trigger` node, and a human message
+ * claimed mid-turn as `steering`) keep an EMPTY summary: the rail resolves the
+ * label from the host `turnOutline` projection or its localized turn number.
+ *
  * @param snap - the chat snapshot (structural subset).
  * @returns ordered turn entries (empty when the snapshot has no turns).
  */
@@ -126,8 +140,8 @@ export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike |
       return {
         turn: item.turn,
         index: index + 1,
-        summary: item.prompt || '(no user message)',
-        fullText: item.prompt || '',
+        summary: item.prompt,
+        fullText: item.prompt,
         startTime: turnTimings?.get(item.turn)?.startTime ?? loc?.start?.time,
         status,
       }
@@ -146,8 +160,9 @@ export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike |
     const status = loc?.status ?? 'unknown'
     const startTime = turnTimings?.get(turn)?.startTime ?? loc?.start?.time
 
-    // Find the first user-message node in this turn.
-    let summary = ''
+    // Label only from a human message node; every other node kind (assistant
+    // step, context injection, compaction checkpoint, tool row) is not a prompt
+    // and must not be shown as one.
     let fullText = ''
     const keys = chat.locations.getTurn(turn)
     for (const key of keys) {
@@ -155,34 +170,15 @@ export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike |
       if (node === undefined) continue
       if (node.kind === 'user') {
         const userData = node.data as UserNode | undefined
-        if (userData !== undefined) {
-          fullText = firstText(userData.content)
-          summary = fullText.length > SUMMARY_MAX_CHARS
-            ? `${fullText.slice(0, SUMMARY_MAX_CHARS - 1)}…`
-            : fullText
-        }
+        if (userData !== undefined) fullText = firstText(userData.content).trim()
         break
       }
-      // Fallback: this turn has no user message (e.g. an error/retry turn, a
-      // context injection, or a compaction checkpoint). Show the first
-      // node's kind + a short text peek so the entry is not a dead label.
-      if (summary === '') {
-        const peek = peekNodeText(node)
-        fullText = peek
-        summary = peek.length > SUMMARY_MAX_CHARS
-          ? `${peek.slice(0, SUMMARY_MAX_CHARS - 1)}…`
-          : peek
-      }
     }
+    const summary = fullText.length > SUMMARY_MAX_CHARS
+      ? `${fullText.slice(0, SUMMARY_MAX_CHARS - 1)}…`
+      : fullText
 
-    entries.push({
-      turn,
-      index: displayIndex,
-      summary: summary || `[${kindLabel(turn, keys, chat)}]`,
-      fullText,
-      startTime,
-      status,
-    })
+    entries.push({ turn, index: displayIndex, summary, fullText, startTime, status })
   }
   return entries
 }
@@ -192,32 +188,6 @@ function unwrapChat(snap: ChatSnapshotLike | ConversationSnapshotLike | undefine
   if (snap === undefined) return undefined
   if ('chat' in snap && snap.chat !== undefined) return snap.chat
   return snap as ChatSnapshotLike
-}
-
-/** Best-effort text peek from a non-user chat node's data (erased shape). */
-function peekNodeText(node: ChatViewNode): string {
-  const data = node.data as Record<string, unknown> | undefined
-  if (data === undefined) return ''
-  for (const field of ['summary', 'text', 'content', 'message', 'name']) {
-    const value = data[field]
-    if (typeof value === 'string' && value.trim().length > 0) return value.trim()
-    if (Array.isArray(value)) {
-      for (const block of value) {
-        if (block !== null && typeof block === 'object') {
-          const b = block as Record<string, unknown>
-          if (typeof b.text === 'string' && b.text.trim().length > 0) return b.text.trim()
-        }
-      }
-    }
-  }
-  return ''
-}
-
-/** Human label for a turn that has no readable first-node text. */
-function kindLabel(turn: number, keys: readonly string[], chat: ChatSnapshotLike): string {
-  const first = chat.nodes.get(keys[0] ?? '')
-  const kind = first?.kind ?? 'turn'
-  return `turn ${turn} (${kind})`
 }
 
 /**

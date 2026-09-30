@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.4.7] - 2026-09-30
+
+### Fixed
+
+- **`(no user message)` in a capsule tooltip — the data layer was fabricating a
+  label the official rail never shows.** A Turn can exist with no human prompt:
+  the host's own `turn/start` contract says rejection, empty input, cancellation
+  or failure "may close it with no step", and every machine-woken turn (goal
+  continuation, plugin waking, background-subagent settlement,
+  `runtime-context` injection, compaction checkpoint) opens without one.
+  Measured on this machine's logs: **108 of 2168 persisted turns (5%) carry no
+  human message**, 27 sessions have such a turn inside the loaded window. Two
+  defects came out of that:
+  - `turns.ts` / `history.ts` fell back to the hardcoded English
+    `'(no user message)'` **in the data layer**, which also made the localized
+    `noSummary` copy dead code (the ZH UI showed the English string);
+  - the journal fold labelled a turn from its FIRST `user/message` of any
+    source, so machine-woken turns surfaced their injected payload
+    (`<goal_round> Objective: …`, runtime context, subagent notices) as the
+    "user message summary" (12 of 24 capsules in one measured session).
+
+  Both channels now keep an EMPTY label unless they read a human prompt, and the
+  tooltip body falls back to the **localized turn number** — the official
+  behaviour (`TurnNavigator.tsx`: `preview.prompt ||
+  t('chat.turnNavigation.turn', { turn })`; official dsh contains no
+  `(no user message)` string at all). The `noSummary` copy key is gone.
+  Live before/after on session `session-f98a008f`: capsule 3 read
+  `Turn 3 — 12:45 — (no user message)`, now reads `Turn 3 — 12:45 — Turn 3`.
+
+### Added
+
+- **Host `turnOutline` projection as the third label source.** The rail now
+  reads `useProjection('turnOutline')` — the host's whole-log fold of
+  `turn/start` boundaries and first human prompts — and merges it the way the
+  official rail does (`ui-chat/src/client/chat/turn-rail-items.ts`): the loaded
+  window supplies the preview, the outline fills it where its own read is empty.
+  Two consequences: a blank entry from one of our read channels never shadows a
+  labelled entry from another, and the outline's turn set can name every started
+  turn even when a read channel missed one (a mid-turn window head, a steering
+  message claimed mid-turn, a compaction checkpoint, an exhausted journal page
+  budget). The journal fold now also requires an **appended** (`surfaceOp:
+  'append'`) human message, matching the host's own fold, so a replaced event
+  cannot label a turn.
+- **`scripts/verify-turn-labels.mjs` — live-GUI gate for the label rules**
+  (`npm run verify:turn-labels`). Walks every session reachable in the sidebar,
+  asserts no capsule tooltip body is a fabricated placeholder or an injected
+  payload, and asserts the bundle the GUI actually SERVES carries no placeholder
+  string (a stale build cannot pass). Red on the pre-fix build (1 placeholder in
+  `session-f98a008f`, 12 leaked payloads in `session-185e864e`), green after.
+- **`scripts/test-turn-labels.mjs` — behavioural gate, part of `npm test` and
+  `verify:all`.** Imports the real `src/client/*.ts` modules through Node's type
+  stripping (no bundle, no React) and pins the fold, the window path, the merge
+  and the tooltip fallback. `docs/guarantees.md` gains G8–G11 for these rules,
+  and the negative controls gain two mutations (a restored placeholder string,
+  and a fold that labels from injected text) that must turn it red.
+
 ## [0.4.6] - 2026-09-25
 
 ### Changed

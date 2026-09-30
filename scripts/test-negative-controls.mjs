@@ -85,6 +85,30 @@ const scenarios = [
       writeFileSync(p, after)
     },
   },
+  {
+    name: 'label fallback replaced by a fabricated placeholder',
+    command: 'node scripts/test-turn-labels.mjs',
+    expect: /fabricated placeholder|no user message/,
+    mutate: (dir) => {
+      const p = join(dir, 'src/client/label.ts')
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace("const body = entry.fullText || entry.summary || label", "const body = entry.fullText || entry.summary || '(no user message)'")
+      if (after === before) throw new Error('mutation did not apply — the tooltip body fallback is not in src/client/label.ts')
+      writeFileSync(p, after)
+    },
+  },
+  {
+    name: 'journal fold labels a machine-woken turn from its injected payload',
+    command: 'node scripts/test-turn-labels.mjs',
+    expect: /machine-woken turn keeps an empty label/,
+    mutate: (dir) => {
+      const p = join(dir, 'src/client/history.ts')
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace('if (current !== null && current.summary === \'\' && isHumanPrompt(event)) {', 'if (current !== null && current.summary === \'\') {')
+      if (after === before) throw new Error('mutation did not apply — the human-prompt guard is not in src/client/history.ts')
+      writeFileSync(p, after)
+    },
+  },
 ]
 
 let failed = 0

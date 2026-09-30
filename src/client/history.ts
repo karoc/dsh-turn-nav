@@ -19,6 +19,8 @@ export interface HistoryEventLike {
   seq: number
   time: number
   data: { turn?: number; content?: readonly { type: string; text?: string }[]; [key: string]: unknown }
+  /** Surface operation (`'append'`, or an object for a replaced range) — see {@link isHumanPrompt}. */
+  surfaceOp?: unknown
 }
 
 /** Structural subset of the history page response. */
@@ -46,7 +48,9 @@ export interface HistoryApi {
 export interface HistoryTurn {
   turn: number
   index: number
+  /** Bounded first human prompt, or `''` for a turn without one (label falls back to its number). */
   summary: string
+  /** Full first human prompt, or `''`. */
   fullText: string
   startTime: number | undefined
   /** Seq of this turn's `turn/start` event — used to decide window inclusion. */
@@ -109,6 +113,8 @@ export interface SessionAccessHandle {
 const SUMMARY_MAX_CHARS = 80
 /** Safety cap on history pages read (50 events each). */
 const MAX_HISTORY_PAGES = 500
+/** Surface operation of an appended (not replaced/superseded) log event. */
+const APPEND_SURFACE_OP = 'append'
 /** Journal page size in MESSAGES (user/assistant count) — no host cap, fewer round trips. */
 const JOURNAL_PAGE_MESSAGES = 200
 /** Safety cap on journal pages read. */
@@ -124,6 +130,34 @@ function firstText(content: readonly { type: string; text?: string }[] | undefin
 
 function truncate(text: string): string {
   return text.length > SUMMARY_MAX_CHARS ? `${text.slice(0, SUMMARY_MAX_CHARS - 1)}…` : text
+}
+
+/**
+ * Whether one log event is a turn's opening HUMAN prompt.
+ *
+ * Two rules, both taken from the host's own turn-outline fold
+ * (`packages/session/session-turn-outline/src/projection.ts`), which is the
+ * official rail's whole-log label source:
+ *
+ *  - `source.kind === 'user'` — only a human submission labels a turn. Other
+ *    `user/message` sources (`goal`, `plugin`, `runtime-context`,
+ *    `agent-message`, `subagent-settled`, `compact-checkpoint`, …) are
+ *    machine-woken turns: the official projection leaves their `prompt` empty
+ *    on purpose, because rendering that text would leak internal payloads
+ *    (`<goal_round> Objective: …`) into a navigation label.
+ *  - append-surface — a message the log appended. A replaced event (e.g. a
+ *    compaction checkpoint, whose `surfaceOp` is an object) is not the current
+ *    surface and must not label the turn. Legacy logs predate the field
+ *    entirely, so an absent `surfaceOp` counts as appended.
+ *
+ * @param event - one `user/message` log event.
+ * @returns whether this event may label its turn.
+ */
+function isHumanPrompt(event: HistoryEventLike): boolean {
+  const data = event.data as { source?: { kind?: unknown } }
+  if (data.source?.kind !== 'user') return false
+  const surfaceOp = (event as { surfaceOp?: unknown }).surfaceOp
+  return surfaceOp === undefined || surfaceOp === APPEND_SURFACE_OP
 }
 
 /**
@@ -235,8 +269,21 @@ export async function fetchJournalTurns(
   return turns
 }
 
-/** Fold a (seq-ascending) event list into ordered turns. */
-function buildTurns(events: readonly HistoryEventLike[]): HistoryTurn[] {
+/**
+ * Fold a (seq-ascending) event list into ordered turns.
+ *
+ * A turn is labelled from its first text-bearing HUMAN prompt
+ * ({@link isHumanPrompt}); a turn that has none keeps an empty label, and the
+ * rail falls back to its localized turn number (`label.ts`) — the official
+ * behaviour. Fabricating a placeholder here would be a lie the render layer
+ * cannot undo, and would also defeat the outline fallback in `merge.ts`.
+ *
+ * Exported for `scripts/test-turn-labels.mjs`.
+ *
+ * @param events - durable log events (any order; sorted here).
+ * @returns turns ascending by number, `index` patched to the list position.
+ */
+export function buildTurns(events: readonly HistoryEventLike[]): HistoryTurn[] {
   const sorted = [...events].sort((a, b) => a.seq - b.seq)
   const turns: HistoryTurn[] = []
   let current: { turn: number; startSeq: number; time: number; summary: string; fullText: string } | null = null
@@ -258,8 +305,8 @@ function buildTurns(events: readonly HistoryEventLike[]): HistoryTurn[] {
         break
       }
       case 'user/message': {
-        if (current !== null && current.summary === '') {
-          const text = firstText(event.data.content)
+        if (current !== null && current.summary === '' && isHumanPrompt(event)) {
+          const text = firstText(event.data.content).trim()
           current.summary = truncate(text)
           current.fullText = text
           current.time = event.time
@@ -279,7 +326,7 @@ function closeTurn(t: { turn: number; startSeq: number; time: number; summary: s
   return {
     turn: t.turn,
     index: 0, // patched below in buildTurns
-    summary: t.summary || '(no user message)',
+    summary: t.summary,
     fullText: t.fullText,
     startTime: Number.isFinite(t.time) ? t.time : undefined,
     startSeq: t.startSeq,
