@@ -45,7 +45,7 @@ The official built-in `TurnNavigator` has **no off-switch** and is always render
 | Jump to a turn outside the window | ✅ (0.1.3+ unloaded anchor pages history by seq) | ✅ on-demand window extension + "Locating turn N…" pulse/bubble |
 | Long-session open performance | Reads the projection | **Zero prepend** — plain data, no flow re-render, no stall |
 | Follow-scroll highlight | ✅ (0.1.3+ keeps the active mark in the rail viewport, with a pointer guard) | ✅ (v0.4.1+, same pointer-guarded follow) |
-| Hover preview | Prompt (1 line) + response (≤3 lines), no timestamp; a turn with no human prompt shows `Turn N` only | Turn number + **timestamp** + prompt (the **full** first human message for journal-read turns; the host's bounded prompt preview for turns in the loaded window; the host `turnOutline` prompt when neither read one; the localized `Turn N` last) |
+| Hover preview | Prompt (1 line) + response (≤3 lines), no timestamp; a turn with no human prompt shows only its turn number in the prompt line | Turn number + **timestamp** + prompt (the **full** first human message for journal-read turns; the host's bounded prompt preview for turns in the loaded window; the host `turnOutline` prompt when neither read one; the localized `Turn N` last) |
 | Wave ripple animation | ❌ (fixed-pitch ticks widen instead) | ✅ wave ripple |
 | Scroll buttons (click / hover-hold) | ❌ (wheel + gradient fade) | ✅ click / hover-hold |
 | Rail height | Dynamic band (natural height … 420px) | Auto-sized (≤30vh), internal hidden scrollbar |
