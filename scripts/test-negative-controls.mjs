@@ -88,7 +88,9 @@ const scenarios = [
   {
     name: 'label fallback replaced by a fabricated placeholder',
     command: 'node scripts/test-turn-labels.mjs',
-    expect: /fabricated placeholder|no user message/,
+    // The mutation makes the FIRST label assertion fail, so that is the
+    // message this scenario must see — not the later placeholder assertion.
+    expect: /falls back to the localized turn label/,
     mutate: (dir) => {
       const p = join(dir, 'src/client/label.ts')
       const before = readFileSync(p, 'utf8')
