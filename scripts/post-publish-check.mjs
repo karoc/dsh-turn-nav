@@ -23,7 +23,12 @@
  *     transport failures (DNS/connect/timeout/no curl), HTTP 5xx / 407,
  *     unavailable dist-tags, a `latest` tag that lags or points elsewhere, a
  *     lib/index.js checksum difference, and every "index still catching up"
- *     outcome.
+ *     outcome. The "version document 404 while the package document is live"
+ *     case is split by a TARBALL PRESENCE PROBE: a served tarball means the
+ *     upload landed (benign index lag), a 404 tarball means the registry never
+ *     created this version — npm exits 0 for an accepted-but-dropped publish
+ *     (202 is < 400 for npm-registry-fetch), so the report must say "not on the
+ *     registry, retry `npm publish`" instead of "the upload landed".
  *
  * Registry resolution (B4): DSH_POSTPUBLISH_REGISTRY_BASE → npm_config_registry
  * → ./.npmrc → $NPM_CONFIG_USERCONFIG (or ~/.npmrc) → package.json
@@ -194,6 +199,64 @@ async function probe(path, timeoutMs = 10000) {
   }
 }
 
+/** Curl status probe for a tarball URL (child process, so the proxy overlay applies). */
+function curlTarballStatus(url, timeoutMs) {
+  try {
+    const result = spawnSync(
+      'curl',
+      ['-sS', '-I', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', String(Math.ceil(timeoutMs / 1000)), url],
+      { maxBuffer: MAX_BUFFER, env: { ...process.env, ...proxyEnv } },
+    )
+    if (result.error?.code === 'ENOENT' || result.status === 127) return { kind: 'unknown', error: new Error('curl is unavailable') }
+    const status = Number.parseInt(String(result.stdout ?? '').trim(), 10)
+    if (!Number.isFinite(status)) return { kind: 'unknown', error: new Error(`curl exited ${result.status}`) }
+    return interpretTarballStatus(status)
+  } catch (error) {
+    return { kind: 'unknown', error }
+  }
+}
+
+/** Grade one HTTP status into tarball presence. */
+function interpretTarballStatus(status) {
+  if (status === 404 || status === 410) return { kind: 'absent' }
+  if (status >= 200 && status < 300) return { kind: 'present' }
+  return { kind: 'unknown', error: new Error(`HTTP ${status}`) }
+}
+
+/**
+ * Does the registry serve this exact version's tarball?
+ *
+ * This is the discriminator the version document cannot provide: npm's publish
+ * PUT succeeds on ANY status below 400 (`npm-registry-fetch` only throws on
+ * >= 400), so a registry that answers `202 Accepted` makes `npm publish` print
+ * success and exit 0 while creating nothing — the version document then 404s
+ * for a reason that has NOTHING to do with index lag, and claiming "the upload
+ * landed" hides a release that must be retried (live incident: 0.4.7,
+ * 2026-09-30). The tarball URL is deterministic (`/<name>/-/<basename>-<v>.tgz`)
+ * precisely when the version document is missing, so it is probed directly.
+ *
+ * @param url - absolute tarball URL.
+ * @param timeoutMs - per-attempt bound.
+ * @returns `present`, `absent`, or `unknown` (never fatal on transport).
+ */
+async function probeTarballPresence(url, timeoutMs = 10000) {
+  try {
+    const head = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(timeoutMs) })
+    // Some CDNs reject HEAD; a one-byte ranged GET is the portable fallback.
+    if (head.status === 405 || head.status === 501) {
+      const ranged = await fetch(url, { headers: { range: 'bytes=0-0' }, signal: AbortSignal.timeout(timeoutMs) })
+      return interpretTarballStatus(ranged.status)
+    }
+    return interpretTarballStatus(head.status)
+  } catch (error) {
+    if (Object.keys(proxyEnv).length > 0) {
+      const viaCurl = curlTarballStatus(url, timeoutMs)
+      if (viaCurl.kind !== 'unknown' || viaCurl.error?.message !== 'curl is unavailable') return viaCurl
+    }
+    return { kind: 'unknown', error }
+  }
+}
+
 // 1. Poll the version document. A definite 404 is remembered separately from
 //    probe failures: only "both the version and the package document answered a
 //    definite 404" may fail the run.
@@ -228,16 +291,43 @@ if (visible) {
   )
 } else {
   // Index lag, an unreadable probe, or a package that exists without this
-  // version yet: none of these may fail an already-uploaded release.
+  // version yet: none of these may fail an already-uploaded release. What they
+  // must NOT do is claim the upload landed — the version document is missing,
+  // so the tarball is probed as the discriminator (a 202 Accepted publish makes
+  // npm exit 0 without creating anything).
   const observed = packageProbe.kind === 'data' && typeof packageProbe.doc?.['dist-tags']?.latest === 'string'
     ? packageProbe.doc['dist-tags'].latest
     : undefined
-  warnings.push(
-    `version ${version} is not indexed yet after ~${Math.round((ATTEMPTS * INTERVAL_MS) / 1000)}s`
-    + (packageProbe.kind === 'data'
-      ? ` (the package document is live${observed === undefined ? '' : `, latest ${observed}`}) — the upload landed, the index is still catching up`
-      : ' (the package document could not be read either — probe failures are not treated as absence)'),
-  )
+  // Unscoped names have no `%2F`; scoped ones keep only the basename in the
+  // tarball filename (`@scope/pkg` → `pkg-<version>.tgz`).
+  const separator = encodedName.lastIndexOf('%2F')
+  const basename = separator < 0 ? encodedName : encodedName.slice(separator + 3)
+  const tarballUrl = `${registry.base}/${encodedName}/-/${basename}-${encodedVersion}.tgz`
+  const presence = sawVersionAbsent && packageProbe.kind === 'data'
+    ? await probeTarballPresence(tarballUrl)
+    : { kind: 'unknown', error: new Error('the package document is not readable, so absence is unproven') }
+  const latestNote = observed === undefined ? '' : `, latest ${observed}`
+
+  if (presence.kind === 'absent') {
+    warnings.push(
+      `version ${version} is NOT on the registry after ~${Math.round((ATTEMPTS * INTERVAL_MS) / 1000)}s: `
+      + `the version document and its tarball (${tarballUrl}) both answer 404 `
+      + `while the package document is live${latestNote}. npm reported the publish as successful because the registry `
+      + 'answered 202 Accepted, which npm treats as success (npm-registry-fetch only fails on >= 400). '
+      + 'Re-run this script in a few minutes: if the version is still absent, run `npm publish` again — '
+      + 'a duplicate of an accepted upload fails with EPUBLISHCONFLICT, which is the safe outcome.',
+    )
+  } else {
+    warnings.push(
+      `version ${version} is not indexed yet after ~${Math.round((ATTEMPTS * INTERVAL_MS) / 1000)}s`
+      + (packageProbe.kind === 'data'
+        ? ` (the package document is live${latestNote}, and ${presence.kind === 'present'
+          ? 'the version tarball is already served, so the upload landed'
+          : 'the tarball probe was inconclusive'}) — the index is still catching up`
+        : ' (the package document could not be read either — probe failures are not treated as absence)'),
+    )
+  }
+  console.log(`   (version document: 404; tarball ${tarballUrl} → ${presence.kind})`)
 }
 
 // 2. dist-tags are ADVISORY (D11): npm itself refuses to publish a lower

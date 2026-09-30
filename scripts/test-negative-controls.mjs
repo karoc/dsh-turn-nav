@@ -111,6 +111,21 @@ const scenarios = [
       writeFileSync(p, after)
     },
   },
+  {
+    name: 'tarball-presence discriminator reports a dropped publish as landed',
+    command: 'node scripts/test-post-publish.mjs',
+    expect: /scenarios failed/,
+    mutate: (dir) => {
+      const p = join(dir, 'scripts/post-publish-check.mjs')
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace(
+        "if (status === 404 || status === 410) return { kind: 'absent' }",
+        "if (status === 404 || status === 410) return { kind: 'present' }",
+      )
+      if (after === before) throw new Error('mutation did not apply — the tarball presence grading is not in scripts/post-publish-check.mjs')
+      writeFileSync(p, after)
+    },
+  },
 ]
 
 let failed = 0
