@@ -56,36 +56,43 @@ registry is only reachable through the proxy in `.npmrc` — even though
 
 npm accounts with two-factor authentication require an OTP that the agent cannot provide. The agent prepares everything to "one command to publish"; the human runs `npm login` → `npm publish`.
 
-## "npm publish said +pkg@version but nothing is on the registry"
+## "npm publish said +pkg@version but the registry serves nothing"
 
 npm exits 0 whenever the publish `PUT` is answered with any status below 400
 (`npm-registry-fetch` only throws on `>= 400`). The registry uses that room: it
 can answer **`202 Accepted`** and print *"Your package is being processed and may
-take a few minutes to become available"* while creating nothing — observed live
-on 0.4.7 (2026-09-30: `PUT … 202`, npm printed `+ dsh-turn-navigator@0.4.7`,
-and both the version document and its tarball still 404'd 20 minutes later).
+take a few minutes to become available"*. Measured on 0.4.7 (2026-09-30):
+`PUT … 202` → npm printed `+ dsh-turn-navigator@0.4.7` → the version document and
+its tarball still answered **404 twenty minutes later** → **the release was live,
+with `latest` moved, on a later re-run**. So a 404 for the version is *ambiguous*
+(long publish-pipeline lag or a dropped publish) and npm's success line is not
+evidence either way.
 
-So npm's success line is not evidence. `postpublish` runs
-`scripts/post-publish-check.mjs`, which distinguishes the two states by probing
-the version's **tarball** at the deterministic URL (`/<name>/-/<basename>-<v>.tgz`):
+`postpublish` runs `scripts/post-publish-check.mjs`, which removes one of the two
+unknowns by probing the version's **tarball** at the deterministic URL
+(`/<name>/-/<basename>-<v>.tgz`):
 
-- tarball served → the upload landed; only the index lags (benign, re-run later);
-- tarball 404 with the package document live → the version is **not** on the
-  registry; re-run `npm publish` (a duplicate of an accepted upload fails with
-  `EPUBLISHCONFLICT`, which is the safe outcome).
+| probe | meaning | action |
+|---|---|---|
+| tarball served, version document missing | genuine index lag — the upload landed | re-run the check later; nothing else to do |
+| tarball 404, package document live | **ambiguous**: long lag (observed: hours) or dropped | re-run the check later; **do not** re-publish while it is merely unserved |
+| version **and** package document 404 | the upload is unconfirmed | check the publish log, then re-publish |
 
-Recovery recipe when a publish never appears (all read-only until the last step):
+Recovery recipe (all read-only until the last step):
 
 ```sh
 node scripts/post-publish-check.mjs                       # verdict + tarball coordinate
 curl -sSI -x "$(npm config get https-proxy)" https://registry.npmjs.org/<pkg>/-/<pkg>-<version>.tgz | head -1
 npm view <pkg> dist-tags                                  # latest still the old version?
-npm publish                                               # retry — human step (2FA)
+npm publish                                               # only if it stays absent much later — human step (2FA)
 ```
 
-Nothing needs re-tagging after a retry: the version, CHANGELOG entry and tag are
-unchanged, and the failed attempt left no trace on the registry. **Do not bump the
-version for a publish that never landed** — the release was never published.
+A retry never needs a new version, CHANGELOG entry or tag: the first attempt left
+nothing behind, and if it did land meanwhile the retry fails with
+`EPUBLISHCONFLICT` — the safe outcome. **Do not bump the version for a publish
+that never landed**; conversely, once the version IS live, `release:check` starts
+blocking with "already published" — that is the expected post-release state, and
+the next change goes into a new version.
 
 ## Post-release release-check "failures" are expected
 

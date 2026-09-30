@@ -257,16 +257,18 @@ const scenarios = [
   },
   {
     // The live 0.4.7 incident: npm exited 0 because the registry answered 202
-    // Accepted, while the version document AND its tarball both 404. The check
-    // must say so instead of claiming the upload landed.
-    name: 'accepted-but-not-created (version document and tarball both 404)',
+    // Accepted, while the version document AND its tarball both 404 — and the
+    // version DID become live much later without a retry. The check must report
+    // the ambiguity (unserved ≠ dropped) instead of claiming either extreme.
+    name: 'accepted-but-not-visible-yet (version document and tarball both 404)',
     setup: () => Object.assign(state, {
       mode: 'normal', tag: '1.2.2', versionVisible: false, packageVisible: true, syntheticTarball: 'absent',
     }),
     expect: (result) => result.code === 0
-      && result.output.includes('is NOT on the registry')
+      && result.output.includes('is not served by the registry yet')
       && result.output.includes('202 Accepted')
-      && result.output.includes('npm publish` again')
+      && result.output.includes('AMBIGUOUS')
+      && result.output.includes('do NOT re-publish')
       && !result.output.includes('the upload landed'),
   },
   {

@@ -49,21 +49,32 @@
   payload, and asserts the bundle the GUI actually SERVES carries no placeholder
   string (a stale build cannot pass). Red on the pre-fix build (1 placeholder in
   `session-f98a008f`, 12 leaked payloads in `session-185e864e`), green after.
-- **`scripts/post-publish-check.mjs` now tells a dropped publish apart from an
-  index lag.** On 2026-09-30 the 0.4.7 publish was answered **`202 Accepted`**:
-  npm printed `+ dsh-turn-navigator@0.4.7` and exited 0 (npm-registry-fetch only
-  fails on `>= 400`), the post-publish check reported *"the upload landed, the
-  index is still catching up"*, and the registry never created the version —
-  both the version document and its tarball still answered 404 twenty minutes
-  later. The check now probes the version's tarball at the deterministic npm URL
-  when the version document 404s: a served tarball means the upload landed (the
-  old benign wording), while a 404 tarball reports the version as **NOT on the
-  registry**, names the 202 trap and prints the `npm publish` retry recipe.
-  `scripts/test-post-publish.mjs` grew the matching fixture (16/16 scenarios,
-  including the accepted-but-not-created state) and is now wired into `npm test`
-  and `verify:all` — it had no gate coverage before; the negative controls grow a
-  mutation that makes the discriminator report a dropped publish as landed.
-  Recovery steps for this case are documented in `CONTRIBUTING.md`.
+- **`scripts/post-publish-check.mjs` now tells "the registry is not serving this
+  version yet" apart from "the index is merely slow".** On 2026-09-30 the 0.4.7
+  publish was answered **`202 Accepted`**: npm printed
+  `+ dsh-turn-navigator@0.4.7` and exited 0 (npm-registry-fetch only fails on
+  `>= 400`), and the post-publish check reported *"the upload landed, the index
+  is still catching up"* while the registry served nothing at all — the version
+  document and its tarball both answered 404 twenty minutes in. The release did
+  materialize later without a retry (a re-run found it live with `latest` moved),
+  so that state is **long lag, not proof of a dropped publish** — and the fixed
+  check says exactly that instead of asserting either extreme: it probes the
+  version's tarball at the deterministic npm URL
+  (`/<name>/-/<basename>-<v>.tgz`) when the version document 404s, reports a
+  served tarball as genuine index lag, and reports a 404 tarball as *ambiguous*
+  (possible long lag — measured here at hours — or a dropped publish), with the
+  202 trap named and the "re-run this script later; only re-publish if it is
+  still absent much later" remedy. `scripts/test-post-publish.mjs` grew the
+  matching fixture (16/16 scenarios, including the accepted-but-not-visible-yet
+  state) and is now wired into `npm test` and `verify:all` — it had no gate
+  coverage before; the negative controls grow a mutation that makes the
+  discriminator report an unserved version as landed. Recovery steps are
+  documented in `CONTRIBUTING.md`.
+
+  > Corrected after the 0.4.7 release: this entry first read "the registry never
+  > created the version". The published tarball keeps that wording; the record
+  > here reflects the measured behaviour (404 at +20 min, live on a later
+  > re-run). Folded into the next version rather than re-published.
 - **`scripts/test-turn-labels.mjs` — behavioural gate, part of `npm test` and
   `verify:all`.** Imports the real `src/client/*.ts` modules through Node's type
   stripping (no bundle, no React) and pins the fold, the window path, the merge

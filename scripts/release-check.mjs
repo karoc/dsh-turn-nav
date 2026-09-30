@@ -155,6 +155,32 @@ if (stale.length > 0) {
   fail(`build output is stale (src/ newer than ${stale.join(", ")}) — run \`npm run bundle\` first`)
 }
 
+// 7b. every `files` entry exists, and everything the package must ship is listed.
+// This is the static half of `npm pack --dry-run`: a renamed or deleted shipped
+// asset, or a runtime asset left out of the whitelist, otherwise only shows up
+// in the PUBLISHED tarball (where it cannot be fixed) — the mechanism the skill
+// requires instead of a human remembering to eyeball the pack output.
+const shipped = Array.isArray(JSON.parse(read('package.json')).files)
+  ? JSON.parse(read('package.json')).files.filter((entry) => typeof entry === 'string')
+  : []
+if (shipped.length === 0) fail('package.json has no `files` whitelist — a publish would ship everything in the repo')
+for (const entry of shipped) {
+  const clean = entry.replace(/^\.\//, '')
+  if (/[*?[\]]/.test(clean)) {
+    // Glob entry: require the literal prefix directory to exist and hold a match.
+    const prefix = clean.slice(0, clean.search(/[*?[\]]/))
+    const directory = join(root, prefix.endsWith('/') ? prefix : dirname(prefix))
+    if (!existsSync(directory)) fail(`package.json files lists "${entry}" but ${relative(root, directory)} does not exist`)
+    continue
+  }
+  if (!existsSync(join(root, clean))) fail(`package.json files lists "${entry}" but it does not exist — the tarball would silently lose it`)
+}
+for (const required of ['lib/index.js', 'lib/client.js', 'cordis.patch.yml', 'README.md', 'CHANGELOG.md']) {
+  if (!shipped.some((entry) => entry.replace(/^\.\//, '') === required)) {
+    fail(`package.json files must list "${required}" — it is part of the release`)
+  }
+}
+
 // 8. not already published — probed through the npm CLI (`npm view <pkg>
 // versions --json`), the same registry/proxy/auth configuration as the publish
 // it guards; the transport rationale lives on probePublished() below. The

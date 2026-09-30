@@ -18,6 +18,7 @@ import { appendFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { releaseCheckFailures, undocumentedReleaseFailures } from './lib/release-post-state.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const VERSION = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
@@ -112,6 +113,18 @@ const scenarios = [
     },
   },
   {
+    name: 'package.json files lists a shipped asset that does not exist',
+    command: 'node scripts/release-check.mjs',
+    expect: /files lists .*missing-artifact.* but it does not exist/,
+    mutate: (dir) => {
+      const p = join(dir, 'package.json')
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace('"files": [\n    "lib/index.js",', '"files": [\n    "lib/missing-artifact.js",\n    "lib/index.js",')
+      if (after === before) throw new Error('mutation did not apply — the files whitelist is not in package.json')
+      writeFileSync(p, after)
+    },
+  },
+  {
     name: 'tarball-presence discriminator reports a dropped publish as landed',
     command: 'node scripts/test-post-publish.mjs',
     expect: /scenarios failed/,
@@ -135,14 +148,23 @@ console.log('▶ positive control — an unmutated clone must PASS both gates')
   const release = run(dir, 'node scripts/release-check.mjs')
   const guarantees = run(dir, 'node scripts/check-guarantees.mjs')
   rmSync(dir, { recursive: true, force: true })
-  const ok = release.code === 0 && guarantees.code === 0
+  // A PUBLISHED version (and the tag that then sits behind HEAD) fails
+  // release-check by design; only those two documented items may explain a
+  // non-zero exit, and any other failure item means the clone is broken.
+  const documented = releaseCheckFailures(release.output).length
+  const undocumented = undocumentedReleaseFailures(release.output)
+  const releaseOk = release.code === 0 || (documented > 0 && undocumented.length === 0)
+  const ok = releaseOk && guarantees.code === 0
   console.log(`${ok ? '  ✅' : '  ❌'} release-check exit=${release.code}, guarantee gate exit=${guarantees.code}`)
   if (!ok) {
     failed += 1
     console.log(`     release tail: ${release.output.trim().split('\n').slice(-3).join(' | ')}`)
     console.log(`     guarantees tail: ${guarantees.output.trim().split('\n').slice(-2).join(' | ')}`)
   }
-  if (ok) console.log(`     (release-check: ${release.output.trim().split('\n').pop()})`)
+  if (ok) {
+    console.log(`     (release-check: ${release.output.trim().split('\n').pop()})`)
+    if (release.code !== 0) console.log(`     (allowed post-release item(s): ${documented}; undocumented: ${undocumented.length})`)
+  }
 }
 
 for (const scenario of scenarios) {

@@ -310,12 +310,15 @@ if (visible) {
 
   if (presence.kind === 'absent') {
     warnings.push(
-      `version ${version} is NOT on the registry after ~${Math.round((ATTEMPTS * INTERVAL_MS) / 1000)}s: `
+      `version ${version} is not served by the registry yet after ~${Math.round((ATTEMPTS * INTERVAL_MS) / 1000)}s: `
       + `the version document and its tarball (${tarballUrl}) both answer 404 `
       + `while the package document is live${latestNote}. npm reported the publish as successful because the registry `
       + 'answered 202 Accepted, which npm treats as success (npm-registry-fetch only fails on >= 400). '
-      + 'Re-run this script in a few minutes: if the version is still absent, run `npm publish` again — '
-      + 'a duplicate of an accepted upload fails with EPUBLISHCONFLICT, which is the safe outcome.',
+      + 'This state is AMBIGUOUS: a 202 publish can materialize long after the upload (measured in this repo: 0.4.7 was '
+      + 'still 404 twenty minutes after the publish and was live, with `latest` moved, on a later re-run), and it can '
+      + 'also have been dropped. Re-run this script later — do NOT re-publish while the version is merely unserved; '
+      + 'if it is still absent much later, `npm publish` again (a duplicate of an accepted upload fails with '
+      + 'EPUBLISHCONFLICT, which is the safe outcome).',
     )
   } else {
     warnings.push(
