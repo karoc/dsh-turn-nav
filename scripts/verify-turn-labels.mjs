@@ -9,12 +9,13 @@
  * the real GUI obeys them on real data.
  *
  * It asserts, over every session reachable in the sidebar:
- *   1. no capsule tooltip body is the fabricated placeholder `(no user message)`
- *      / `（无用户消息）` — the tooltip body is the line after the turn's time;
- *   2. no capsule tooltip body is an injected payload (`<goal_round>`,
- *      `Current runtime context`, `… sent a message`, `Background subagent …`);
- *   3. no visible capsule tooltip body equals a raw `turn/start`-less state
- *      (checked implicitly by 1 and 2: an unlabelled turn must read `Turn N`);
+ *   1. no capsule tooltip line is the fabricated placeholder `(no user message)`
+ *      / `（无用户消息）`;
+ *   2. no capsule tooltip line is an UNBOUNDED injected payload (`<goal_round>`,
+ *      `Current runtime context`, `… sent a message`, `Background subagent …`) —
+ *      bounded host response previews may quote such text as content;
+ *   3. every capsule tooltip leads with its turn label, so an unlabelled turn
+ *      still reads `Turn N` (counted in the report);
  *   4. the bundle the GUI actually SERVES carries no placeholder string — a
  *      stale build must not be able to pass this gate.
  *
@@ -40,6 +41,15 @@ const shot = option('shot', undefined)
 
 const PLACEHOLDERS = ['(no user message)', '（无用户消息）']
 const INJECTED_PAYLOAD = /<goal_round>|<goal_blocked>|Current runtime context|sent a message|Background subagent|Updated instructions from/
+/**
+ * Tooltips now carry TWO content lines (prompt + host response preview), and a
+ * response is assistant-authored text that may legitimately quote any of the
+ * payload markers above — so the marker check applies only to lines that are
+ * UNBOUNDED. The old journal leak surfaced the raw injected message (hundreds of
+ * chars); the host's response preview is capped at 120 chars, so a marker inside
+ * a bounded preview is content, not a leaked label.
+ */
+const LEAKED_PAYLOAD_MIN_CHARS = 200
 
 let chromium
 try {
@@ -132,13 +142,23 @@ try {
     for (const label of labels) {
       const body = bodyOf(label).trim()
       const turn = label.split(' — ')[0]
-      if (PLACEHOLDERS.includes(body)) {
-        failures.push(`${sessionId} ${turn}: capsule tooltip body is the fabricated placeholder "${body}"`)
-      } else if (INJECTED_PAYLOAD.test(body)) {
-        failures.push(`${sessionId} ${turn}: capsule tooltip body leaks an injected payload: "${body.slice(0, 80)}…"`)
-      } else if (new RegExp(`^${turn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`).test(body)) {
-        labelledFallback += 1
+      // `bodyOf` joins the content lines back with ' — ', so each line is
+      // inspected separately.
+      const lines = body.split(' — ').map((line) => line.trim())
+      if (lines.some((line) => PLACEHOLDERS.includes(line))) {
+        failures.push(`${sessionId} ${turn}: capsule tooltip line is the fabricated placeholder`)
+        continue
       }
+      if (!/^(Turn|第)\s*\d+/.test(label)) {
+        failures.push(`${sessionId}: capsule tooltip does not lead with its turn label: "${label.slice(0, 60)}"`)
+        continue
+      }
+      const leaked = lines.find((line) => INJECTED_PAYLOAD.test(line) && line.length >= LEAKED_PAYLOAD_MIN_CHARS)
+      if (leaked !== undefined) {
+        failures.push(`${sessionId} ${turn}: capsule tooltip leaks an injected payload: "${leaked.slice(0, 80)}…"`)
+        continue
+      }
+      if (lines.length === 1) labelledFallback += 1
     }
   }
 

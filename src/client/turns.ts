@@ -50,6 +50,7 @@ export interface ChatSnapshotLike {
       readonly turn: number
       readonly anchorKey: string
       readonly prompt: string
+      /** Bounded preview of the turn's newest text-bearing assistant node (the loaded window's own response). */
       readonly response: string
     }[]
   }
@@ -83,6 +84,12 @@ export interface TurnEntry {
   summary: string
   /** Same source as `summary` (the host's bounded preview is all a window turn carries). */
   fullText: string
+  /**
+   * Bounded host preview of the turn's response, exactly as the window
+   * projection computed it (empty on the legacy timeline path, which has no
+   * response projection; the outline merge fills it there).
+   */
+  response: string
   /** Unix epoch ms from turnTimings or turn.start. */
   startTime: number | undefined
   /** Turn status from the timeline. */
@@ -142,6 +149,7 @@ export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike |
         index: index + 1,
         summary: item.prompt,
         fullText: item.prompt,
+        response: typeof item.response === 'string' ? item.response : '',
         startTime: turnTimings?.get(item.turn)?.startTime ?? loc?.start?.time,
         status,
       }
@@ -178,7 +186,7 @@ export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike |
       ? `${fullText.slice(0, SUMMARY_MAX_CHARS - 1)}…`
       : fullText
 
-    entries.push({ turn, index: displayIndex, summary, fullText, startTime, status })
+    entries.push({ turn, index: displayIndex, summary, fullText, response: '', startTime, status })
   }
   return entries
 }

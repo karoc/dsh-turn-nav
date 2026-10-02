@@ -44,6 +44,8 @@ export interface RailTurn {
   index: number
   summary: string
   fullText: string
+  /** Bounded host preview of the turn's response (empty while the host has none). */
+  response: string
   startTime: number | undefined
   status: string
 }

@@ -52,6 +52,13 @@ export interface HistoryTurn {
   summary: string
   /** Full first human prompt, or `''`. */
   fullText: string
+  /**
+   * Always `''`: the persisted log below the window is read for PROMPTS only.
+   * The response preview comes from the host projection channels (`turnOutline`
+   * for these turns, the loaded window for the turns it holds) — indexing
+   * assistant text here would duplicate the host's fold and its bounds.
+   */
+  response: string
   startTime: number | undefined
   /** Seq of this turn's `turn/start` event — used to decide window inclusion. */
   startSeq: number | undefined
@@ -328,6 +335,7 @@ function closeTurn(t: { turn: number; startSeq: number; time: number; summary: s
     index: 0, // patched below in buildTurns
     summary: t.summary,
     fullText: t.fullText,
+    response: '',
     startTime: Number.isFinite(t.time) ? t.time : undefined,
     startSeq: t.startSeq,
     status: 'closed',

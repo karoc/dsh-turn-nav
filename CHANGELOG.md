@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.4.8] - 2026-10-02
+
+### Added
+
+- **The capsule tooltip now carries the turn's response preview, like the
+  official rail.** Reported from the desktop shell on a 49-turn session: at turn
+  46 the official tooltip showed `Turn 46` *plus* a response preview, while ours
+  showed the turn number alone. Turn 46 has no human prompt at all — its only
+  `user/message` is a `tool-jobs` background-job notice, so the prompt line is
+  empty in BOTH rails; the official's content was its response line, which 0.4.7
+  did not render. The rail now merges a response preview per turn exactly the way
+  it merges prompts: the loaded window's own `response` projection first (it can
+  already describe a running turn), the host `turnOutline.response` (the last
+  text-bearing assistant message, committed at `turn/end`, bounded to 120 chars)
+  as the whole-log fallback. The plugin still derives NO response text itself —
+  it stays a read-only label over host-computed data.
+  Tooltip shape: `Turn N` / time / prompt (omitted when the turn has none — the
+  leading label already IS the turn number, so it is not repeated) / response
+  (omitted when empty). Live before/after on the reported session: turn 46 went
+  from `Turn 46 — 21:09 — Turn 46` to `Turn 46 — 21:09 — ## \`linux-smoke\`
+  修复闭环 + 一个新门禁（PR #66/#67/#68 → \`main = b103764\`）…`, matching the
+  official tooltip's content line for the same turn.
+- **`docs/guarantees.md` G12** pins the new negative guarantee: the response line
+  comes only from host projections (never parsed out of the transcript by the
+  plugin), and a bounded preview may quote payload-shaped text as content while an
+  unbounded injected label still fails the live gate.
+
+### Tests
+
+- `scripts/test-turn-labels.mjs` pins the response plumbing (window response wins
+  over outline; the outline labels journal turns the window does not hold; a
+  machine-woken turn renders label + time + response with NO duplicated label
+  line; an empty preview adds no line) and the live gate
+  `scripts/verify-turn-labels.mjs` was adapted to the two-line tooltip: the
+  injected-payload check now fires on UNBOUNDED lines only (a bounded 120-char
+  response preview may quote `<goal_round>` as content), and every tooltip must
+  still lead with its turn label. Negative controls grow a mutation that drops the
+  response line from the tooltip.
+
 ## [0.4.7] - 2026-09-30
 
 ### Fixed

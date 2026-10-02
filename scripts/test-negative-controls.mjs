@@ -125,6 +125,18 @@ const scenarios = [
     },
   },
   {
+    name: 'response preview dropped from the tooltip',
+    command: 'node scripts/test-turn-labels.mjs',
+    expect: /host response preview on a turn without a human prompt/,
+    mutate: (dir) => {
+      const p = join(dir, 'src/client/label.ts')
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace("  if (response !== '') lines.push(response)\n", '')
+      if (after === before) throw new Error('mutation did not apply — the response line is not in src/client/label.ts')
+      writeFileSync(p, after)
+    },
+  },
+  {
     name: 'tarball-presence discriminator reports a dropped publish as landed',
     command: 'node scripts/test-post-publish.mjs',
     expect: /scenarios failed/,

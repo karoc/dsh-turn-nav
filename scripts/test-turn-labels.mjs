@@ -120,25 +120,78 @@ const translator = (dict) => (key, params) => String(dict[key]).replace('{n}', S
   assert.equal(turns[2].summary, '', 'a turn-trigger (machine-woken) window turn keeps an empty label')
 }
 
+// ── window path (0.1.2+ navigation projection) ─────────────────────────────
+{
+  const nodes = new Map([
+    ['u1', { key: 'u1', kind: 'user', data: { kind: 'user', seq: 1, time: T0, content: [{ type: 'text', text: '窗口内的提示词' }] } }],
+    ['t4', { key: 't4', kind: 'turn-trigger', data: { content: [{ type: 'text', text: 'goal text' }] } }],
+  ])
+  const chat = {
+    order: ['u1', 't4'],
+    nodes: { get: (key) => nodes.get(key) },
+    locations: { getTurn: (turn) => (turn === 1 ? ['u1'] : ['t4']) },
+    navigation: {
+      items: () => [
+        { turn: 1, anchorKey: 'u1', prompt: '窗口内的提示词', response: '第一轮的回复预览' },
+        { turn: 2, anchorKey: 't4', prompt: '', response: '窗口里的回复预览' },
+      ],
+    },
+    timeline: {
+      turnOrder: [1, 2],
+      turns: new Map([
+        [1, { turn: 1, start: { time: T0 }, status: 'closed' }],
+        [2, { turn: 2, start: { time: T0 + 1000 }, status: 'closed' }],
+      ]),
+    },
+  }
+  const turns = extractTurns(chat)
+  assert.equal(turns[0].response, '第一轮的回复预览', 'a loaded window turn carries the host response projection')
+  assert.equal(turns[1].response, '窗口里的回复预览', 'a machine-woken window turn carries its response preview')
+  assert.equal(turns[1].summary, '', 'a machine-woken window turn still has no prompt')
+}
+
+// ── window path (legacy timeline, no navigation projection) ────────────────
+{
+  const nodes = new Map([
+    ['u1', { key: 'u1', kind: 'user', data: { kind: 'user', seq: 1, time: T0, content: [{ type: 'text', text: 'legacy 提示词' }] } }],
+  ])
+  const chat = {
+    nodes: { get: (key) => nodes.get(key) },
+    locations: { getTurn: () => ['u1'] },
+    timeline: {
+      turnOrder: [1],
+      turns: new Map([[1, { turn: 1, start: { time: T0 }, status: 'closed' }]]),
+    },
+  }
+  const turns = extractTurns(chat)
+  assert.equal(turns[0].fullText, 'legacy 提示词', 'the legacy timeline path still labels from a human node')
+  assert.equal(turns[0].response, '', 'the legacy timeline path carries no response (the outline merge fills it)')
+}
+
 // ── merge: blank channels never shadow a labelled one ──────────────────────
 {
-  const history = [{ turn: 1, index: 1, summary: '', fullText: '', startTime: T0, status: 'closed' }]
-  const window = [{ turn: 1, index: 1, summary: '窗口预览', fullText: '窗口预览', startTime: T0 + 5, status: 'open' }]
+  const history = [{ turn: 1, index: 1, summary: '', fullText: '', response: '', startTime: T0, status: 'closed' }]
+  const window = [{ turn: 1, index: 1, summary: '窗口预览', fullText: '窗口预览', response: '窗口回复', startTime: T0 + 5, status: 'open' }]
   const merged = mergeRailTurns(history, window, undefined)
   assert.equal(merged[0].summary, '窗口预览', 'a blank journal entry never shadows a labelled window entry')
   assert.equal(merged[0].status, 'open', 'the window keeps its live status on a shared turn')
 
   const outline = [
-    { turn: 1, prompt: 'outline 提示词' },
-    { turn: 2, prompt: '' },
-    { turn: 3, prompt: '第三轮的人类提示词' },
+    { turn: 1, prompt: 'outline 提示词', response: 'outline 回复一' },
+    { turn: 2, prompt: '', response: 'outline 回复二' },
+    { turn: 3, prompt: '第三轮的人类提示词', response: '' },
   ]
-  const empty = [{ turn: 1, index: 1, summary: '', fullText: '', startTime: T0, status: 'closed' }]
+  const empty = [{ turn: 1, index: 1, summary: '', fullText: '', response: '', startTime: T0, status: 'closed' }]
   const withOutline = mergeRailTurns(empty, [], outline)
   assert.equal(withOutline[0].summary, 'outline 提示词', 'the host outline labels a turn its own channel could not read')
   assert.equal(withOutline[1].summary, '', 'an outline entry with no human prompt stays unlabelled')
   assert.equal(withOutline[2].summary, '第三轮的人类提示词', 'the outline labels turns missing from both read channels')
   assert.deepEqual(withOutline.map((entry) => entry.index), [1, 2, 3], 'the merged list re-derives every index')
+
+  assert.equal(merged[0].response, '窗口回复', 'the loaded window response wins over the outline response')
+  assert.equal(withOutline[0].response, 'outline 回复一', 'the outline response labels a journal turn the window does not hold')
+  assert.equal(withOutline[1].response, 'outline 回复二', 'a machine-woken turn keeps the outline response preview')
+  assert.equal(withOutline[2].response, '', 'a turn whose response preview is empty stays empty')
 
   const bothEmpty = mergeRailTurns([], empty.map((entry) => ({ ...entry, turn: 9 })), [])
   assert.equal(bothEmpty[0].summary, '', 'a turn no channel could label keeps an empty summary (label time decides)')
@@ -146,21 +199,38 @@ const translator = (dict) => (key, params) => String(dict[key]).replace('{n}', S
 
 // ── tooltip: the localized turn number is the fallback ─────────────────────
 {
-  const unlabelled = { turn: 3, startTime: T0, fullText: '', summary: '' }
+  const unlabelled = { turn: 3, startTime: T0, fullText: '', summary: '', response: '' }
   const enTooltip = tooltipText(unlabelled, translator(en))
   const zhTooltip = tooltipText(unlabelled, translator(zh))
-  assert.ok(enTooltip.endsWith('Turn 3'), 'the tooltip body falls back to the localized turn label (en)')
-  assert.ok(zhTooltip.endsWith('第 3 轮'), 'the tooltip body falls back to the localized turn label (zh)')
+  assert.ok(enTooltip.startsWith('Turn 3'), 'the tooltip leads with the localized turn label (en)')
+  assert.ok(zhTooltip.startsWith('第 3 轮'), 'the tooltip leads with the localized turn label (zh)')
   assert.ok(
     !enTooltip.includes('no user message') && !zhTooltip.includes('无用户消息'),
     'the tooltip never renders a fabricated placeholder for a turn without a human prompt',
   )
+  assert.equal(enTooltip.split('\n').length, 2, 'a turn with neither prompt nor response shows label + time only')
+  assert.equal(
+    tooltipText({ turn: 3, startTime: undefined, fullText: '', summary: '' }, translator(en)).split('\n').length,
+    1,
+    'an unknown time collapses the tooltip to the label alone',
+  )
 
-  const labelled = tooltipText({ turn: 7, startTime: T0, fullText: '真实提示词', summary: '真实提示词' }, translator(en))
+  // The reported case: a machine-woken turn whose ONLY content is the host's
+  // response preview (official rail shows "Turn N" + response there).
+  const machineWoken = tooltipText(
+    { turn: 46, startTime: T0, fullText: '', summary: '', response: '## linux-smoke 修复闭环 + 一个新门禁' },
+    translator(en),
+  )
+  assert.ok(machineWoken.includes('## linux-smoke 修复闭环 + 一个新门禁'), 'the tooltip shows the host response preview on a turn without a human prompt')
+  assert.equal(machineWoken.split('\n').filter((line) => line === 'Turn 46').length, 1, 'the prompt line is not a duplicate of the leading turn label')
+
+  const labelled = tooltipText({ turn: 7, startTime: T0, fullText: '真实提示词', summary: '真实提示词', response: '回复预览' }, translator(en))
   assert.ok(labelled.includes('真实提示词'), 'the tooltip shows the prompt when one was read')
+  assert.ok(labelled.endsWith('回复预览'), 'the tooltip appends the response preview after the prompt')
   assert.ok(labelled.startsWith('Turn 7'), 'the tooltip always leads with the turn number')
+  assert.equal(labelled.split('\n').length, 4, 'a human turn renders label + time + prompt + response')
 
   assert.equal(formatTime(undefined), '', 'an unknown start time renders no time line')
 }
 
-console.log('PASS — turn labels (journal/window/outline merge + localized fallback, no fabricated placeholder)')
+console.log('PASS — turn labels (journal/window/outline merge + prompt/response previews + localized fallback, no fabricated placeholder)')
