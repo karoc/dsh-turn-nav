@@ -14,9 +14,13 @@
  *   2. no capsule tooltip line is an UNBOUNDED injected payload (`<goal_round>`,
  *      `Current runtime context`, `… sent a message`, `Background subagent …`) —
  *      bounded host response previews may quote such text as content;
- *   3. every capsule tooltip leads with its turn label, so an unlabelled turn
- *      still reads `Turn N` (counted in the report);
- *   4. the bundle the GUI actually SERVES carries no placeholder string — a
+ *   3. every capsule leads with its turn label inside the preview (counted in the
+ *      report), and its accessible NAME is the jump action (official
+ *      `chat.turnNavigation.jump` / `jumpLoad` wording) — never the preview text;
+ *   4. the preview is reachable by KEYBOARD: focusing a capsule renders the
+ *      `role="tooltip"` node and the capsule's `aria-describedby` resolves to it
+ *      (the official a11y pattern);
+ *   5. the bundle the GUI actually SERVES carries no placeholder string — a
  *      stale build must not be able to pass this gate.
  *
  * Pre-fix evidence (same checks, same machine, 2026-09-30): session
@@ -40,6 +44,8 @@ const limit = Number(option('limit', '40'))
 const shot = option('shot', undefined)
 
 const PLACEHOLDERS = ['(no user message)', '（无用户消息）']
+/** Accessible names the official rail uses for a mark (localized). */
+const ACTION_NAME = /^(Jump to turn|Load and jump to turn|跳转到第|加载并跳转到第)\s*\d+/
 const INJECTED_PAYLOAD = /<goal_round>|<goal_blocked>|Current runtime context|sent a message|Background subagent|Updated instructions from/
 /**
  * Tooltips now carry TWO content lines (prompt + host response preview), and a
@@ -115,7 +121,7 @@ try {
     .map((row) => ({ key: row.getAttribute('data-row-key'), title: (row.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40) })))
   console.log(`sidebar: ${sessionKeys.length} session row(s)`)
 
-  let checked = 0
+  let probedCount = 0
   let labelledFallback = 0
   for (const session of sessionKeys.slice(0, limit)) {
     const sessionId = session.key.replace('session:', '')
@@ -137,28 +143,52 @@ try {
     // Let the incremental history pages land before judging the list.
     await page.waitForTimeout(2500)
     labels = await page.evaluate(() => [...document.querySelectorAll('.tn-cap-btn')].map(b => b.getAttribute('aria-label') ?? ''))
-    checked += labels.length
+    void labels
 
-    for (const label of labels) {
-      const body = bodyOf(label).trim()
-      const turn = label.split(' — ')[0]
-      // `bodyOf` joins the content lines back with ' — ', so each line is
-      // inspected separately.
-      const lines = body.split(' — ').map((line) => line.trim())
-      if (lines.some((line) => PLACEHOLDERS.includes(line))) {
-        failures.push(`${sessionId} ${turn}: capsule tooltip line is the fabricated placeholder`)
+    // Each capsule is inspected through the KEYBOARD path: focus it, then read
+    // the linked preview node (`aria-describedby` → role="tooltip").
+    const probes = await page.evaluate(async (capsuleCount) => {
+      const out = []
+      const capsules = [...document.querySelectorAll('.tn-cap-btn')]
+      for (let index = 0; index < capsules.length && out.length < capsuleCount; index += 1) {
+        const capsule = capsules[index]
+        capsule.focus()
+        await new Promise((resolve) => setTimeout(resolve, 60))
+        const describedby = capsule.getAttribute('aria-describedby')
+        const node = describedby === null ? null : document.getElementById(describedby)
+        out.push({
+          name: capsule.getAttribute('aria-label') ?? '',
+          describedby,
+          lines: node === null ? null : (node.textContent ?? '').split('\n').map((line) => line.trim()).filter((line) => line !== ''),
+        })
+      }
+      return out
+    }, 40)
+
+    probedCount += probes.length
+    for (const probe of probes) {
+      if (!ACTION_NAME.test(probe.name)) {
+        failures.push(`${sessionId}: capsule accessible name is not the jump action: "${probe.name.slice(0, 60)}"`)
         continue
       }
-      if (!/^(Turn|第)\s*\d+/.test(label)) {
-        failures.push(`${sessionId}: capsule tooltip does not lead with its turn label: "${label.slice(0, 60)}"`)
+      if (probe.lines === null) {
+        failures.push(`${sessionId} ${probe.name}: focusing the capsule rendered no described tooltip (aria-describedby=${String(probe.describedby)})`)
         continue
       }
-      const leaked = lines.find((line) => INJECTED_PAYLOAD.test(line) && line.length >= LEAKED_PAYLOAD_MIN_CHARS)
+      if (!/^(Turn|第)\s*\d+/.test(probe.lines[0] ?? '')) {
+        failures.push(`${sessionId} ${probe.name}: preview does not lead with its turn label: "${String(probe.lines[0]).slice(0, 60)}"`)
+        continue
+      }
+      if (probe.lines.some((line) => PLACEHOLDERS.includes(line))) {
+        failures.push(`${sessionId} ${probe.name}: preview line is the fabricated placeholder`)
+        continue
+      }
+      const leaked = probe.lines.find((line) => INJECTED_PAYLOAD.test(line) && line.length >= LEAKED_PAYLOAD_MIN_CHARS)
       if (leaked !== undefined) {
-        failures.push(`${sessionId} ${turn}: capsule tooltip leaks an injected payload: "${leaked.slice(0, 80)}…"`)
+        failures.push(`${sessionId} ${probe.name}: preview leaks an injected payload: "${leaked.slice(0, 80)}…"`)
         continue
       }
-      if (lines.length === 1) labelledFallback += 1
+      if (probe.lines.length === 1) labelledFallback += 1
     }
   }
 
@@ -173,7 +203,7 @@ try {
   }
 
   if (shot !== undefined) await page.screenshot({ path: join(root, shot) })
-  console.log(`checked ${sessionKeys.length} session row(s), ${checked} capsule tooltip(s); ${labelledFallback} unlabelled turn(s) fell back to the localized turn label`)
+  console.log(`checked ${sessionKeys.length} session row(s), ${probedCount} capsule preview(s) via keyboard; ${labelledFallback} preview(s) carried the turn label only`)
   console.log(`served rail bundle(s): ${bundles.map((bundle) => bundle.url.split('/').slice(-2).join('/')).join(', ') || 'none'}`)
 } finally {
   await browser.close()

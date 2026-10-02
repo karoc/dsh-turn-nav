@@ -129,6 +129,21 @@ const scenarios = [
     },
   },
   {
+    name: 'accessible name recites the preview instead of the action',
+    command: 'node scripts/test-turn-labels.mjs',
+    expect: /named by the jump ACTION/,
+    mutate: (dir) => {
+      const p = join(dir, 'src/client/label.ts')
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace(
+        "return t(entry.loaded ? 'jumpToTurn' : 'jumpToTurnLoad', { n: String(entry.turn) })",
+        "return t('turnLabel', { n: String(entry.turn) })",
+      )
+      if (after === before) throw new Error('mutation did not apply — the action label is not in src/client/label.ts')
+      writeFileSync(p, after)
+    },
+  },
+  {
     name: 'response preview dropped from the tooltip',
     command: 'node scripts/test-turn-labels.mjs',
     expect: /host response preview on a turn without a human prompt/,

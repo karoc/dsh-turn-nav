@@ -27,6 +27,23 @@
   plugin), and a bounded preview may quote payload-shaped text as content while an
   unbounded injected label still fails the live gate.
 
+### Changed (official-design conformance)
+
+- **The capsule's accessible name is now the ACTION, and the preview is its
+  description** — the pattern the official rail uses
+  (`TurnNavigator.tsx`: `aria-label={t('chat.turnNavigation.jump' | 'jumpLoad')}`
+  plus `aria-describedby={previewId}` on a `role="tooltip"` node). Until now our
+  `aria-label` recited the whole tooltip (`Turn N — time — prompt — response`),
+  so a screen-reader user heard a content dump with no indication that the button
+  navigates, and the preview node had no id to be linked to. Now: the name is
+  `Jump to turn N` / `Load and jump to turn N` (`跳转到第 N 轮` /
+  `加载并跳转到第 N 轮` — the exact official wording, the load variant for turns
+  still outside the loaded window, i.e. the official `anchor.kind`), the preview
+  is linked via `aria-describedby`, the active capsule carries `aria-current`,
+  the in-flight jump carries `aria-busy`, and **tabbing to a capsule renders the
+  same preview the pointer gets** (the official rail shows it on focus too; ours
+  showed it on hover only).
+
 ### Tests
 
 - `scripts/test-turn-labels.mjs` pins the response plumbing (window response wins
@@ -36,7 +53,10 @@
   `scripts/verify-turn-labels.mjs` was adapted to the two-line tooltip: the
   injected-payload check now fires on UNBOUNDED lines only (a bounded 120-char
   response preview may quote `<goal_round>` as content), and every tooltip must
-  still lead with its turn label. Negative controls grow a mutation that drops the
+  still lead with its turn label. The gate now reads each preview through the
+  KEYBOARD path (focus the capsule → resolve `aria-describedby` → read the
+  `role="tooltip"` node) and asserts the accessible name is the jump action, so
+  the a11y wiring is verified live rather than by inspection. Negative controls grow a mutation that drops the
   response line from the tooltip.
 
 ## [0.4.7] - 2026-09-30

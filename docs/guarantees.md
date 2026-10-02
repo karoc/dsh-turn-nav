@@ -19,6 +19,7 @@ pin — they must not be read as if a test guards them).
 | G9 | 空标签在**渲染层**回退到**本地化轮次标签**（zh `第 N 轮` / en `Turn N`），与官方 `TurnNavigator` 的 `preview.prompt \|\| t('chat.turnNavigation.turn')` 同语义；标签**永远在首行**且不因 prompt 为空而重复 | `the tooltip leads with the localized turn label (en)` |
 | G10 | journal 折叠**只**用人类来源（`source.kind === 'user'`）的**追加**（surfaceOp append）消息标注轮次：注入文本（`<goal_round>`、runtime-context、compaction checkpoint…）永不进入标签 | `the journal fold never copies injected payload text into a turn label` |
 | G11 | 多通道合并时**空 channel 不遮蔽有内容的 channel**，且宿主 `turnOutline` 投影可单独为两条读通道都够不到的轮次提供标签 | `a blank journal entry never shadows a labelled window entry` |
+| G13 | 胶囊的可访问**名称**是**动作**（官方 `chat.turnNavigation.jump` / `jumpLoad` 同文案：`跳转到第 N 轮` / `加载并跳转到第 N 轮`），内容（提示词/回复）只作为 **description** 经 `aria-describedby` 指向 `role="tooltip"` 节点；名称**永不**复述预览内容 | `a loaded capsule is named by the jump ACTION, like the official rail` |
 | G12 | 回复预览**只来自宿主投影**（窗口 `response` 优先，`turnOutline.response` 兜底），插件**不自行**从会话流摘取助手正文；无人类提示词的轮次（如 background-job 唤醒轮）显示"轮次号 + 时间 + 回复预览"，且 prompt 行不重复轮次号 | `the tooltip shows the host response preview on a turn without a human prompt` |
 
 ## 未钉住（由构造/审阅保证，**没有**自动化测试）

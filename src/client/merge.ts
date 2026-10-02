@@ -31,6 +31,13 @@ export interface RailSourceTurn {
    * at `turn/end` — which is exactly what the official rail shows.
    */
   response: string
+  /**
+   * Whether the turn is in the LOADED window (the official rail's
+   * `anchor.kind === 'loaded'`). Drives the accessible name: a loaded mark jumps
+   * directly, an unloaded one pages history in first
+   * (`chat.turnNavigation.jump` vs `jumpLoad`).
+   */
+  loaded: boolean
   startTime: number | undefined
   status: string
 }
@@ -104,6 +111,7 @@ export function mergeRailTurns(
       // Window first: its preview reflects the loaded conversation (including a
       // running turn); the outline's response is the whole-log fallback.
       response: firstText(fromWindow?.response, fromOutline?.response),
+      loaded: fromWindow !== undefined,
       startTime: fromHistory?.startTime ?? fromWindow?.startTime,
       status: fromWindow?.status ?? fromHistory?.status ?? 'closed',
     }

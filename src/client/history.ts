@@ -59,6 +59,8 @@ export interface HistoryTurn {
    * assistant text here would duplicate the host's fold and its bounds.
    */
   response: string
+  /** Journal turns are by definition OUTSIDE the loaded window (see `fetchJournalTurns`). */
+  loaded: boolean
   startTime: number | undefined
   /** Seq of this turn's `turn/start` event — used to decide window inclusion. */
   startSeq: number | undefined
@@ -336,6 +338,7 @@ function closeTurn(t: { turn: number; startSeq: number; time: number; summary: s
     summary: t.summary,
     fullText: t.fullText,
     response: '',
+    loaded: false,
     startTime: Number.isFinite(t.time) ? t.time : undefined,
     startSeq: t.startSeq,
     status: 'closed',

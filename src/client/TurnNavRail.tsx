@@ -20,13 +20,13 @@
  * flow, and jumping loads only what is needed to reach the target.
  */
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { extractTurns, firstNodeKeyOfTurn, turnOfNodeKey, type ChatSnapshotLike, type ConversationSnapshotLike } from './turns.ts'
 import { mergeRailTurns, type OutlineTurnLike } from './merge.ts'
-import { tooltipText } from './label.ts'
+import { markLabel, tooltipText } from './label.ts'
 import {
   fetchAllTurns,
   fetchJournalTurns,
@@ -46,6 +46,8 @@ export interface RailTurn {
   fullText: string
   /** Bounded host preview of the turn's response (empty while the host has none). */
   response: string
+  /** Whether the turn is in the loaded window (drives the accessible name). */
+  loaded: boolean
   startTime: number | undefined
   status: string
 }
@@ -174,6 +176,10 @@ export function TurnNavRail({ useSession, useChat, useProjection, sessionId, t, 
   // scroll container because our own rail is fixed OUTSIDE it, and it uses the
   // COMPUTED display value so the stylesheet override is respected.
   const [officialRail, setOfficialRail] = useState(false)
+  // Accessible description wiring, the official pattern: every mark points its
+  // `aria-describedby` at the preview node's id, and the node exists while a
+  // capsule is hovered or focused.
+  const previewId = useId()
   const railRef = useRef<HTMLDivElement | null>(null)
   const tipRef = useRef<HTMLDivElement | null>(null)
   const hoverScrollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -541,8 +547,19 @@ export function TurnNavRail({ useSession, useChat, useProjection, sessionId, t, 
                 const rect = e.currentTarget.getBoundingClientRect()
                 setHoverY(rect.top + rect.height / 2)
               }}
+              onFocus={(e) => {
+                // Keyboard parity with the pointer: tabbing to a capsule shows
+                // the same preview the official rail shows on focus.
+                setHoverIndex(i)
+                const rect = e.currentTarget.getBoundingClientRect()
+                setHoverY(rect.top + rect.height / 2)
+              }}
+              onBlur={() => setHoverIndex(-1)}
               onClick={(e) => handleCapsuleClick(entry.turn, i, e)}
-              aria-label={tooltipText(entry, t).replace(/\n/g, ' — ')}
+              aria-label={markLabel(entry, t)}
+              aria-current={isActive ? 'true' : undefined}
+              aria-busy={loading ? 'true' : undefined}
+              aria-describedby={previewId}
             >
               <span className="tn-cap" />
             </button>
@@ -582,7 +599,7 @@ export function TurnNavRail({ useSession, useChat, useProjection, sessionId, t, 
           VIEWPORT — being a child of .tn-wrap (which has a transform) would
           make the wrapper the containing block and misplace it. */}
       {hoverEntry !== undefined && createPortal(
-        <div ref={tipRef} className="tn-tip" style={{ top: tipTop }} role="tooltip">
+        <div ref={tipRef} id={previewId} className="tn-tip" style={{ top: tipTop }} role="tooltip">
           {tooltipText(hoverEntry, t)}
         </div>,
         document.body,

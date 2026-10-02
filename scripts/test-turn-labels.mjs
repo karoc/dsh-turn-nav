@@ -27,7 +27,7 @@ import assert from 'node:assert/strict'
 import { buildTurns } from '../src/client/history.ts'
 import { extractTurns } from '../src/client/turns.ts'
 import { mergeRailTurns } from '../src/client/merge.ts'
-import { tooltipText, formatTime } from '../src/client/label.ts'
+import { markLabel, tooltipText, formatTime } from '../src/client/label.ts'
 import { en, zh } from '../src/client/locales.ts'
 
 // ── fixtures ───────────────────────────────────────────────────────────────
@@ -170,8 +170,8 @@ const translator = (dict) => (key, params) => String(dict[key]).replace('{n}', S
 
 // ── merge: blank channels never shadow a labelled one ──────────────────────
 {
-  const history = [{ turn: 1, index: 1, summary: '', fullText: '', response: '', startTime: T0, status: 'closed' }]
-  const window = [{ turn: 1, index: 1, summary: '窗口预览', fullText: '窗口预览', response: '窗口回复', startTime: T0 + 5, status: 'open' }]
+  const history = [{ turn: 1, index: 1, summary: '', fullText: '', response: '', loaded: false, startTime: T0, status: 'closed' }]
+  const window = [{ turn: 1, index: 1, summary: '窗口预览', fullText: '窗口预览', response: '窗口回复', loaded: true, startTime: T0 + 5, status: 'open' }]
   const merged = mergeRailTurns(history, window, undefined)
   assert.equal(merged[0].summary, '窗口预览', 'a blank journal entry never shadows a labelled window entry')
   assert.equal(merged[0].status, 'open', 'the window keeps its live status on a shared turn')
@@ -181,7 +181,7 @@ const translator = (dict) => (key, params) => String(dict[key]).replace('{n}', S
     { turn: 2, prompt: '', response: 'outline 回复二' },
     { turn: 3, prompt: '第三轮的人类提示词', response: '' },
   ]
-  const empty = [{ turn: 1, index: 1, summary: '', fullText: '', response: '', startTime: T0, status: 'closed' }]
+  const empty = [{ turn: 1, index: 1, summary: '', fullText: '', response: '', loaded: false, startTime: T0, status: 'closed' }]
   const withOutline = mergeRailTurns(empty, [], outline)
   assert.equal(withOutline[0].summary, 'outline 提示词', 'the host outline labels a turn its own channel could not read')
   assert.equal(withOutline[1].summary, '', 'an outline entry with no human prompt stays unlabelled')
@@ -189,6 +189,24 @@ const translator = (dict) => (key, params) => String(dict[key]).replace('{n}', S
   assert.deepEqual(withOutline.map((entry) => entry.index), [1, 2, 3], 'the merged list re-derives every index')
 
   assert.equal(merged[0].response, '窗口回复', 'the loaded window response wins over the outline response')
+  assert.equal(merged[0].loaded, true, 'a turn the window holds is marked loaded (the official anchor kind)')
+  assert.equal(withOutline[0].loaded, false, 'a journal/outline-only turn is marked unloaded')
+  assert.equal(
+    markLabel({ turn: 46, loaded: true }, translator(en)),
+    'Jump to turn 46',
+    'a loaded capsule is named by the jump ACTION, like the official rail',
+  )
+  assert.equal(
+    markLabel({ turn: 46, loaded: false }, translator(en)),
+    'Load and jump to turn 46',
+    'an unloaded capsule announces that it pages history in first (official jumpLoad wording)',
+  )
+  assert.equal(markLabel({ turn: 7, loaded: true }, translator(zh)), '跳转到第 7 轮', 'the action name is localized (zh)')
+  assert.equal(markLabel({ turn: 7, loaded: false }, translator(zh)), '加载并跳转到第 7 轮', 'the load variant is localized (zh)')
+  assert.ok(
+    !markLabel({ turn: 46, loaded: true }, translator(en)).includes('linux-smoke'),
+    'the accessible name never recites the preview content (that is the description)',
+  )
   assert.equal(withOutline[0].response, 'outline 回复一', 'the outline response labels a journal turn the window does not hold')
   assert.equal(withOutline[1].response, 'outline 回复二', 'a machine-woken turn keeps the outline response preview')
   assert.equal(withOutline[2].response, '', 'a turn whose response preview is empty stays empty')

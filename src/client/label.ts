@@ -38,14 +38,33 @@ export interface LabelEntry {
   response?: string
 }
 
+/** Keys this module needs from the plugin's dictionary. */
+export type LabelKey = 'turnLabel' | 'jumpToTurn' | 'jumpToTurnLoad'
+
 /** Translator bound to this plugin's namespace. */
-export type LabelTranslator = (key: 'turnLabel', params?: Record<string, unknown>) => string
+export type LabelTranslator = (key: LabelKey, params?: Record<string, unknown>) => string
 
 /** Short HH:MM from a Unix-epoch-ms timestamp (empty when unknown). */
 export function formatTime(ms: number | undefined): string {
   if (ms === undefined || ms === null || !Number.isFinite(ms)) return ''
   const date = new Date(ms)
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * Accessible NAME of one capsule: the ACTION the button performs, mirroring the
+ * official rail (`chat.turnNavigation.jump` for a loaded mark, `jumpLoad` for one
+ * whose content still has to be paged in). The prompt/response preview is the
+ * DESCRIPTION (`aria-describedby` → the `role="tooltip"` node), never baked into
+ * the name — a name has to answer "what does this button do?", not recite the
+ * conversation.
+ *
+ * @param entry - the rail entry behind the capsule.
+ * @param t - the plugin's translator.
+ * @returns the localised action label.
+ */
+export function markLabel(entry: { turn: number; loaded: boolean }, t: LabelTranslator): string {
+  return t(entry.loaded ? 'jumpToTurn' : 'jumpToTurnLoad', { n: String(entry.turn) })
 }
 
 /**

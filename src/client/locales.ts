@@ -9,6 +9,11 @@ export const en = {
   // compaction checkpoint, mid-turn window head): the turn is labelled by its
   // NUMBER — the official rail does the same and has no placeholder string.
   turnLabel: 'Turn {n}',
+  // Accessible NAME of a capsule — the ACTION, exactly like the official rail
+  // (`chat.turnNavigation.jump` / `jumpLoad`). The prompt/response content is
+  // exposed through aria-describedby instead of being baked into the name.
+  jumpToTurn: 'Jump to turn {n}',
+  jumpToTurnLoad: 'Load and jump to turn {n}',
   locatingTurn: 'Locating turn {n}…',
   locateFailed: 'Could not locate turn {n}',
   // Settings → General preference row (which rail to show).
@@ -28,6 +33,8 @@ export const zh: { [Key in keyof typeof en]: string } = {
   scrollUp: '向上滚动胶囊条',
   scrollDown: '向下滚动胶囊条',
   turnLabel: '第 {n} 轮',
+  jumpToTurn: '跳转到第 {n} 轮',
+  jumpToTurnLoad: '加载并跳转到第 {n} 轮',
   locatingTurn: '正在定位第 {n} 轮…',
   locateFailed: '无法定位第 {n} 轮',
   modeRowTitle: '轮次导航',

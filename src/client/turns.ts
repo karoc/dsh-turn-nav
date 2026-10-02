@@ -90,6 +90,8 @@ export interface TurnEntry {
    * response projection; the outline merge fills it there).
    */
   response: string
+  /** Window turns are loaded by definition (the journal marks its own `false`). */
+  loaded: boolean
   /** Unix epoch ms from turnTimings or turn.start. */
   startTime: number | undefined
   /** Turn status from the timeline. */
@@ -150,6 +152,7 @@ export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike |
         summary: item.prompt,
         fullText: item.prompt,
         response: typeof item.response === 'string' ? item.response : '',
+        loaded: true,
         startTime: turnTimings?.get(item.turn)?.startTime ?? loc?.start?.time,
         status,
       }
@@ -186,7 +189,7 @@ export function extractTurns(snap: ChatSnapshotLike | ConversationSnapshotLike |
       ? `${fullText.slice(0, SUMMARY_MAX_CHARS - 1)}…`
       : fullText
 
-    entries.push({ turn, index: displayIndex, summary, fullText, response: '', startTime, status })
+    entries.push({ turn, index: displayIndex, summary, fullText, response: '', loaded: true, startTime, status })
   }
   return entries
 }

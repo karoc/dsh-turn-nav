@@ -51,7 +51,7 @@ The official built-in `TurnNavigator` has **no off-switch** and is always render
 | Rail height | Dynamic band (natural height … 420px) | Auto-sized (≤30vh), internal hidden scrollbar |
 | Narrow viewport (<900px) | Auto-hidden | Auto-hidden (mirrors official) |
 | **Hide / switch rail** | ❌ no off-switch | ✅ Settings → General → 3 modes; `Hide all` hides both |
-| Keyboard accessibility | ✅ focus ring + `aria-current`/`aria-busy`/`aria-describedby` | ✅ focusable buttons (`Turn N — time — prompt — response` aria-label) |
+| Keyboard accessibility | ✅ focus ring + `aria-current`/`aria-busy`/`aria-describedby` | ✅ same pattern: the accessible **name is the action** (`Jump to turn N` / `Load and jump to turn N` for a turn still outside the window) with `aria-current`/`aria-busy`, and the preview is linked through `aria-describedby` → `role="tooltip"`; **tabbing to a capsule shows the preview** (no pointer required) |
 | Source | Built-in, cannot be disabled | External plugin, **can be replaced/disabled** |
 
 As of dsh 0.1.3 the built-in rail caught up on full-session scope and out-of-window jumps. What still sets Smoothly TN apart: you can **switch it off** (the official rail cannot), the tooltip carries the **timestamp**, the full first human message for turns read from the journal, and the same **response preview** the official rail shows (falling back to the localized turn number when a turn has no human prompt), there are **scroll buttons and wave hover**, and it remains an **external plugin with zero host changes and no conversation writes**. And on dsh ≤ 0.1.2 the built-in rail is simpler still (loaded window only), so the gap Smoothly TN closes is even larger there.
