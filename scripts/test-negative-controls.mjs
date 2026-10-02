@@ -89,14 +89,18 @@ const scenarios = [
   {
     name: 'label fallback replaced by a fabricated placeholder',
     command: 'node scripts/test-turn-labels.mjs',
-    // The mutation makes the FIRST label assertion fail, so that is the
-    // message this scenario must see — not the later placeholder assertion.
-    expect: /falls back to the localized turn label/,
+    // The mutation reintroduces the original defect at its new home: the prompt
+    // line fabricating content for a turn that has none. The assertion it must
+    // trip is the placeholder ban (the leading label itself still passes).
+    expect: /fabricated placeholder for a turn without a human prompt/,
     mutate: (dir) => {
       const p = join(dir, 'src/client/label.ts')
       const before = readFileSync(p, 'utf8')
-      const after = before.replace("const body = entry.fullText || entry.summary || label", "const body = entry.fullText || entry.summary || '(no user message)'")
-      if (after === before) throw new Error('mutation did not apply — the tooltip body fallback is not in src/client/label.ts')
+      const after = before.replace(
+        'const prompt = (entry.fullText || entry.summary).trim()',
+        "const prompt = (entry.fullText || entry.summary || '(no user message)').trim()",
+      )
+      if (after === before) throw new Error('mutation did not apply — the prompt line is not in src/client/label.ts')
       writeFileSync(p, after)
     },
   },
