@@ -30,7 +30,7 @@
 | 🎯 **跳转任意轮** | 精确 `scrollTop` 定位（不与 `scrollIntoView` 打架）；窗口外跳转按需扩展窗口并显示"正在定位第 N 轮…"脉冲+气泡；最老轮次跳转加载到**真正第一轮**（`hasMore = false`） |
 | 👁️ **滚动跟随高亮** | 阅读线所在轮次的胶囊随滚动点亮——且胶囊条自身视口会跟随当前轮次保持可见 |
 | ⬆️⬇️ **滚动按钮** | 点击或悬停持续滚动；无可滚动内容时置灰 |
-| 🎛️ **胶囊条模式开关** | 设置 → 通用 → *轮次导航*：`DSH 官方` / `思磨力轮次胶囊条`（默认）/ `全部隐藏`——跨刷新持久保存，官方胶囊条终于可以**关掉** |
+| 🎛️ **胶囊条模式开关** | 插件 → dsh-turn-navigator → *轮次导航*：`DSH 官方` / `思磨力轮次胶囊条`（默认）/ `全部隐藏`——跨刷新持久保存，官方胶囊条终于可以**关掉** |
 | ♿ **键盘可达** | **Tab 聚焦即出预览**（`aria-describedby` → `role="tooltip"`），可访问名是动作而非内容（`跳转到第 N 轮` / `加载并跳转到第 N 轮`），活动/加载态走 `aria-current`/`aria-busy` |
 | 🔌 **纯外部插件** | 不改 DSH 源码；零宿主改动；零新增依赖；不写会话内容（DOM 写入仅限注入的 `style` 标签、一个 `body` class 与一次性跳转高亮） |
 
@@ -51,7 +51,7 @@
 | 滚动按钮（点击 / 悬停持续） | ❌（滚轮 + 渐隐） | ✅ 点击 / 悬停持续 |
 | 胶囊条高度 | 动态 band（自然高…420px） | 自适应（≤30vh）+ 内部隐藏滚动条 |
 | 窄窗口（<900px） | 自动隐藏 | 自动隐藏（与官方对齐） |
-| **隐藏 / 切换胶囊条** | ❌ 无开关 | ✅ 设置 → 通用 → 三档；`全部隐藏` 两者皆隐 |
+| **隐藏 / 切换胶囊条** | ❌ 无开关 | ✅ 插件 → dsh-turn-navigator → 三档；`全部隐藏` 两者皆隐 |
 | 键盘可达 | ✅ 焦点环 + `aria-current`/`aria-busy`/`aria-describedby` | ✅ 同款：可访问名 = **动作**（`跳转到第 N 轮` / `加载并跳转到第 N 轮`，未加载轮次会先翻页）+ `aria-current`/`aria-busy`，预览经 `aria-describedby` 指向 `role="tooltip"`；**Tab 聚焦即出预览**（与官方一致，不靠鼠标） |
 | 来源 | 内置、无法关闭 | 外部插件，**可替换 / 可关闭** |
 
@@ -91,7 +91,7 @@ dsh web
 
 ## 使用
 
-0. **选择显示哪个胶囊条**（设置 → 通用 → **轮次导航**）：`DSH 官方`（内置 rail）、`思磨力轮次胶囊条`（本插件 rail——**默认**）、或`全部隐藏`。官方 rail 没有关闭开关，选择思磨力轮次胶囊条时以样式覆盖将其隐藏，我们的 rail 接管右缘居中位置。选择会跨刷新持久保存。
+0. **选择显示哪个胶囊条**（插件 → dsh-turn-navigator → **轮次导航**）：`DSH 官方`（内置 rail）、`思磨力轮次胶囊条`（本插件 rail——**默认**）、或`全部隐藏`。官方 rail 没有关闭开关，选择思磨力轮次胶囊条时以样式覆盖将其隐藏，我们的 rail 接管右缘居中位置。选择会跨刷新持久保存。
 1. 打开任意包含至少一轮已完成轮次的会话。
 2. 会话右侧出现一条竖向灰色胶囊列（每轮一个）。胶囊条**长度自适应**：轮次少则短，轮次多则达 30vh 上限后内部滚动（滚动条隐藏，无布局抖动）。
 3. **悬停**某个胶囊：它以主题色亮起并泛起波浪、向左加宽，胶囊条左侧弹出 Tooltip（**序号、时间、提示词、回复预览**；没有人类提示词的轮次只显示轮次号 + 回复预览），始终完整在视口内。
@@ -105,7 +105,7 @@ dsh web
 | Slot | 作用域 | 职责 |
 |------|--------|------|
 | `conversation.session.header.utilities` | session | 悬浮轮次胶囊条（`position: fixed`；通过框架 `useChat`/`useSession` kit 读取实时会话快照） |
-| `settings.general.item` | root | 设置 → 通用 的 *轮次导航* 模式开关 |
+| `plugins.bundle.config` | root | 插件页本 bundle 详情页的 *轮次导航* 模式开关（按 `dsh-turn-navigator` 索引） |
 
 - **全量历史即数据**：dsh 0.1.2+ 上，胶囊条通过 Typert Remote `session/page` 通道分页读取与官方窗口同一条持久化日志（`ctx.remote.session`——由基础 web 装配挂载；**零宿主改动、零新增依赖**）；旧版 dsh 走 `sessions.history` RPC。每轮从 `turn/start` / `user/message` / `turn/end` 原始事件派生为纯数据。
 - **按需跳转**：点击窗口内轮次直接滚动；窗口外轮次通过官方会话 store 的 `loadOlder()` 逐页扩展窗口（以权威 `hasMore` 为终止条件）直到目标进入视图——这是唯一触碰会话流的路径，且只在点击时发生。
@@ -116,8 +116,8 @@ dsh web
 ## 兼容性
 
 - DeepSeek Harness (dsh) Web 客户端（`dsh web`）；基于 dsh 0.1.2+ 开发与实测，并在 **dsh 0.1.3-alpha.1 上复测通过**（Playwright 直连实测，2026-09-06：全量历史胶囊条、跳转、跟随高亮、模式开关、官方胶囊条样式接管全部通过）。
-- 需要 `conversation.session.header.utilities` 与 `settings.general.item` slot 声明（当前 DSH 已包含）。
-- 客户端契约已对照 **dsh 0.1.6-alpha.2** 复核（2026-09-22）：`conversation.session.header.utilities` 与 `settings.general.item` 的 slot 声明、胶囊条用到的 `ui-primitives` 导出、以及它引用的 `--dsw-alias-*` token 均仍存在。0.1.6 上的 Playwright 交互复测**未重跑**（2026-09-06 那次仍是最近一次交互验证）。
+- 需要 `conversation.session.header.utilities` slot 声明与 plugin manager 的 `plugins.bundle.config` seam（dsh 0.2.x）。
+- 客户端契约已对照 **dsh 0.2.1-rc.5** 复核（2026-10-31）：`conversation.session.header.utilities` 与 `plugins.bundle.config` 的 slot 声明、胶囊条用到的 `ui-primitives` 导出、以及它引用的 `--dsw-alias-*` token 均仍存在。0.1.6 上的 Playwright 交互复测**未重跑**（2026-09-06 那次仍是最近一次交互验证）。
 - 默认 `思磨力轮次胶囊条` 模式以样式覆盖隐藏官方 rail，我们的 rail 居中接管；`DSH 官方` 模式显示内置 rail；`全部隐藏` 两者皆隐。900px 以下都自动隐藏。
 - 与 DSH 全局面板（如看板）共存：面板接管 `main` slot 条目，会话视图（连同本胶囊条）随之被换出，而不是叠在其下。
 - **已知限制（DOM 兜底）**：当没有可读的会话存储（较旧宿主）时，胶囊条通过点击会话流自带的翻页控件来扩展窗口，而这条路径只识别该控件的**中/英**文案（空闲与加载中）——在第三种语言的宿主上它无法扩展窗口；主用的 journal 通道（dsh 0.1.2+）完全不读文案。

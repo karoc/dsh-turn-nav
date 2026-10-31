@@ -13,7 +13,7 @@ pin — they must not be read as if a test guards them).
 | G3 | `apply()` **至少注册一个可 dispose 的 cordis effect**（否则热更新会泄漏） | `apply() registered at least one cordis effect to dispose` |
 | G4 | 默认模式（`stn`）下 `apply()` **用 body class 隐藏官方 rail**，而不是靠删 DOM | `apply() hides the OFFICIAL rail through the body class (default mode is stn)` |
 | G5 | `apply()` **注册会话头 rail 槽位**（`conversation.session.header.utilities`） | `apply() still registers the session-header rail` |
-| G6 | `apply()` **注册设置页偏好行**（`settings.general.item`） | `apply() still registers the settings preference row` |
+| G6 | `apply()` **注册 bundle 配置页**（`plugins.bundle.config`，key `dsh-turn-navigator`） | `apply() still registers the bundle configuration entry` |
 | G7 | **`dispose()` 必须移除 body class，让官方 rail 回来**——这是 HMR / 实时禁用的核心契约，漏了它用户会以为胶囊条"关不掉" | `dispose() removes the body class so the OFFICIAL rail comes back (HMR/live-disable contract)` |
 | G8 | **任何数据层都不伪造占位符**：无人类提示词的轮次（机器唤醒的 goal/plugin/subagent-settled/compaction 轮、空输入/取消轮）在 journal 与窗口两条路径上都只产出**空标签**，绝不产出 `(no user message)` 之类的自造文案 | `no data-layer path fabricates a "(no user message)" placeholder` |
 | G9 | 空标签在**渲染层**回退到**本地化轮次标签**（zh `第 N 轮` / en `Turn N`），与官方 `TurnNavigator` 的 `preview.prompt \|\| t('chat.turnNavigation.turn')` 同语义；标签**永远在首行**且不因 prompt 为空而重复 | `the tooltip leads with the localized turn label (en)` |

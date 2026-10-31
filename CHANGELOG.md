@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] - 2026-10-31
+
+### Changed
+
+- **The rail-mode switch moved to the Plugins page.** dsh 0.1.6-alpha.2 replaced
+  `settings.plugin.item` with the plugin manager's `plugins.bundle.config` seam;
+  the switch no longer registers a top-level `settings.general.item` row but the
+  bundle's own configuration entry (keyed `dsh-turn-navigator`), rendered at
+  **Plugins → dsh-turn-navigator** (dsh 0.2.x). The rail itself (the session
+  header utility) is unchanged.
+- `dsh.client.inject` now declares `@deepseek-ai/dsh-client-ui-plugin-manager`
+  (the module that declares the slot) and drops three stale type-only entries
+  (`dsh-client-connection`, `dsh-client-ui-conversation`, `dsh-client-ui-layout`)
+  that the client bundle never required.
+
 ## [0.4.8] - 2026-10-02
 
 ### Added

@@ -105,8 +105,8 @@ assert.ok(
   'apply() still registers the session-header rail',
 )
 assert.ok(
-  registered.some((o) => o.name === 'settings.general.item'),
-  'apply() still registers the settings preference row',
+  registered.some((o) => o.name === 'plugins.bundle.config' && o.key === 'dsh-turn-navigator'),
+  'apply() still registers the bundle configuration entry',
 )
 
 // ── dispose exactly like cordis does when the plugin is unloaded ───────────

@@ -12,8 +12,8 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the shell's SlotMap merges (the 'conversation.session
 // .header.utilities' entry) into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-// Type-only: pulls the settings domain's SlotMap merges ('settings.general.item').
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: pulls the Plugins page's SlotMap merge ('plugins.bundle.config').
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
@@ -145,12 +145,12 @@ export function apply(ctx: ClientContext): void {
   }
   resolveHandles()
 
-  // Settings → General preference row: WHICH turn rail to show (DSH official /
-  // Smoothly TN / hide all). Root scope, like the built-in preference rows.
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: 'dsh-turn-navigator-mode',
-    order: 30,
+  // Plugins page bundle configuration: WHICH turn rail to show (DSH official /
+  // Smoothly TN / hide all). The plugin manager renders `plugins.bundle.config`
+  // on this bundle's detail page, keyed by the bundle's package name.
+  ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
+    name: 'plugins.bundle.config',
+    key: 'dsh-turn-navigator',
     locale: NS,
     inject: (): ModeRowInjected => ({ t }),
   }, SettingsNavModeRow))

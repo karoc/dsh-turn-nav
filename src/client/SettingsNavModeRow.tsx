@@ -1,9 +1,10 @@
 /**
  * Settings → General row: WHICH turn-navigation rail to show.
  *
- * Registered into `settings.general.item` (root scope) by the plugin's apply;
- * the General section renders each contribution as one row, so this component
- * draws its own title, description, and a three-way selector:
+ * Registered into `plugins.bundle.config` (keyed by the bundle name) by the
+ * plugin's apply; the Plugins page renders it on this bundle's detail page
+ * (`view: 'page'`), so this component draws its own title, description, and a
+ * three-way selector:
  *
  *   DSH official | Smoothly TN (Smoothly Turn Nav) | Hide all
  *
@@ -22,8 +23,12 @@ export interface ModeRowInjected {
   t: (key: TurnNavKey, params?: Record<string, unknown>) => string
 }
 
-/** Full Settings-row props (the section supplies nothing). */
-export type ModeRowProps = ModeRowInjected
+/** Full row props: the injected face plus the view the Plugins page asks for. */
+export type ModeRowProps = ModeRowInjected & {
+  /** `page` renders the row; `summary` is never used for bundle config, but the
+   * component returns null for it rather than inventing a one-liner. */
+  readonly view?: 'summary' | 'page'
+}
 
 const OPTIONS: readonly { id: RailMode; label: TurnNavKey }[] = [
   { id: 'official', label: 'modeOfficial' },
@@ -32,7 +37,8 @@ const OPTIONS: readonly { id: RailMode; label: TurnNavKey }[] = [
 ]
 
 /** Render the rail display-mode preference row. */
-export function SettingsNavModeRow({ t }: ModeRowProps) {
+export function SettingsNavModeRow({ t, view }: ModeRowProps) {
+  if (view === 'summary') return null
   const mode = useSyncExternalStore(subscribeRailMode, getRailMode)
   const [open, setOpen] = useState(false)
   const selectedLabel = OPTIONS.find(option => option.id === mode)?.label ?? 'modeSTN'
